@@ -18,19 +18,22 @@ class ScraperLogger:
         c_time: str = str(time.localtime()[3]) + ":" + str(time.localtime()[4]) + ":" + str(time.localtime()[5])
         return c_time
 
-    def scrape_food(self, url):
+    def scrape_food(self, url: str):
         pass
 
-    def scrape_search_results(self, url):
+    def scrape_search_results(self, url: str):
         pass
 
-    def enqueue(self, url, func):
+    def enqueue(self, url: str, func):
         pass
 
-    def food_in_db(self, url):
+    def food_in_db(self, url: str):
         pass
 
-    def enter_in_db(self, food):
+    def enter_in_db(self, food: dict):
+        pass
+
+    def check_ingredients(self, food: dict):
         pass
 
 
@@ -56,17 +59,20 @@ class VerboseScraperLogger(ScraperLogger):
     def __del__(self):
         self.logfile.close()
 
-    def scrape_food(self, url):
+    def scrape_food(self, url: str):
         self.logfile.write("{} - Scraping food details from URL: {}\n\n".format(self.get_time(), url))
 
-    def scrape_search_results(self, url):
+    def scrape_search_results(self, url: str):
         self.logfile.write("{} - Scraping search results from URL: {}\n\n".format(self.get_time(), url))
 
-    def enqueue(self, url, func):
+    def enter_in_db(self, food: dict):
+        self.logfile.write("{} - Entering food: {} into database...\n\n".format(self.get_time(), food))
+
+    def enqueue(self, url: str, func):
         self.logfile.write("{} - Enqueuing URL: {} with FUNC: {}\n\n".format(self.get_time(), url, func))
 
-    def food_in_db(self, url):
+    def food_in_db(self, url: str):
         self.logfile.write("{} - Checking DB for entry with URL: {}\n\n".format(self.get_time(), url))
 
-    def enter_in_db(self, food):
-        self.logfile.write("{} - Entering food: {} into database...\n\n".format(self.get_time(), food))
+    def check_ingredients(self, food: dict):
+        self.logfile.write("{} - Checking ingredients in food: {}\n\n".format(self.get_time(), food))

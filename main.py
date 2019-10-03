@@ -1,4 +1,4 @@
-from logger import VerboseScraperLogger
+from logger import *
 from scraper import Scraper
 
 THREADS = 1

@@ -11,10 +11,10 @@ class TestScraper(TestCase):
     def test_start(self):
         self.fail()
 
-    def test__scrape_search_results(self):
+    def test__scrape_food(self):
         self.fail()
 
-    def test__scrape_food(self):
+    def test__scrape_search_results(self):
         self.fail()
 
     def test__enter_in_db(self):
@@ -27,4 +27,7 @@ class TestScraper(TestCase):
         self.fail()
 
     def test__check_and_enter_food(self):
+        self.fail()
+
+    def test__check_ingredients(self):
         self.fail()
