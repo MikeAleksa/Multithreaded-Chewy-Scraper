@@ -3,7 +3,7 @@ from scraper import Scraper
 
 THREADS = 1
 LOGGER = VerboseScraperLogger
-DATABASE = 'db.sqlite3'
+DATABASE = "db.sqlite3"
 
 
 def main():
@@ -11,5 +11,5 @@ def main():
     scraper.start()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

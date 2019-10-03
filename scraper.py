@@ -19,7 +19,7 @@ class Scraper:
         """
         enqueue all search pages to be scraped on different threads
         """
-        pass
+        self._scrape_search_results("www.google.com")
 
     def _scrape_search_results(self, url):
         """
@@ -32,19 +32,19 @@ class Scraper:
         """
         scrape page for dog food details and return a dict to be added to the db
         """
-        food = {'item_num': None,
-                'url': None,
-                'ingredients': None,
-                'brand': None,
-                'xsm_breed': None,
-                'sm_breed': None,
-                'md_breed': None,
-                'lg_breed': None,
-                'xlg_breed': None,
-                'food_form': None,
-                'lifestage': None,
-                'special_diet': None,
-                'fda_guidelines': None,
+        food = {"item_num": None,
+                "url": None,
+                "ingredients": None,
+                "brand": None,
+                "xsm_breed": None,
+                "sm_breed": None,
+                "md_breed": None,
+                "lg_breed": None,
+                "xlg_breed": None,
+                "food_form": None,
+                "lifestage": None,
+                "special_diet": None,
+                "fda_guidelines": None,
                 }
         # scrape food data here
         return food
@@ -55,7 +55,7 @@ class Scraper:
         """
         conn = sqlite3.connect(self.database)
         cur = conn.cursor()
-        cur.execute('INSERT INTO foods VALUES ({})'.format(food.items()))
+        cur.execute("INSERT INTO foods VALUES ({})".format(food.items()))
         # enter food data into db here
 
     def _enqueue_url(self, url, func):
@@ -73,7 +73,7 @@ class Scraper:
         # open connection to database
         conn = sqlite3.connect(self.database)
         cur = conn.cursor()
-        results = cur.execute('SELECT * FROM foods WHERE url = {}'.format(url))
+        results = cur.execute("SELECT * FROM foods WHERE url = {}".format(url))
         conn.close()
 
         if results:
