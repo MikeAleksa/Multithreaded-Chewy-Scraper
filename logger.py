@@ -36,6 +36,9 @@ class ScraperLogger:
     def check_ingredients(self, food: dict):
         pass
 
+    def error(self, msg: str):
+        pass
+
 
 class SilentScraperLogger(ScraperLogger):
     pass
@@ -53,8 +56,11 @@ class VerboseScraperLogger(ScraperLogger):
         c_date: str = self.get_date()
         c_time: str = self.get_time()
         logfile_name: str = "logs/" + c_date + "_" + c_time + "_logfile.txt"
-        self.logfile = open(logfile_name, "w")
-        self.logfile.write("LOG FILE STARTED: {} {}\n\n".format(c_date, c_time))
+        if not os.path.exists(logfile_name):
+            self.logfile = open(logfile_name, "a")
+            self.logfile.write("LOG FILE STARTED: {}\n\n".format(time.asctime()))
+        else:
+            self.logfile = open(logfile_name, "a")
 
     def __del__(self):
         self.logfile.close()
@@ -76,3 +82,6 @@ class VerboseScraperLogger(ScraperLogger):
 
     def check_ingredients(self, food: dict):
         self.logfile.write("{} - Checking ingredients in food: {}\n\n".format(self.get_time(), food))
+
+    def error(self, msg: str):
+        self.logfile.write("{} - {}\n".format(self.get_time(), msg))

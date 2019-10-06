@@ -1,9 +1,21 @@
+import re
 import sqlite3
 
 from logger import SilentScraperLogger
 
 
 class Scraper:
+    COLUMNS = ["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
+               "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet", "fda_guidelines", ]
+
+    COLUMN_NAMES = ", ".join(COLUMNS)
+
+    BAD_INGREDIENTS = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)|(chickpea)')
+
+    VITAMINS = re.compile('(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|' +
+                          '(potassium)|(sodium)|(magnesium)|(sulfer)|(iron)|(iodine)|' +
+                          '(selenium)|(copper)')
+
     def __init__(self, max_threads: int, logger_class, database: str):
         self.db: str = database
         self.queue = []
@@ -26,6 +38,7 @@ class Scraper:
         scrape page for dog food details and return a dict to be added to the db
         """
         self.logger.scrape_food(url)
+
         food = {"item_num": None,
                 "url": None,
                 "ingredients": None,
@@ -40,6 +53,7 @@ class Scraper:
                 "special_diet": None,
                 "fda_guidelines": None,
                 }
+
         # scrape food data here
         return food
 
@@ -55,10 +69,34 @@ class Scraper:
         enter a food item into the database
         """
         self.logger.enter_in_db(food)
-        conn = sqlite3.connect(self.database)
-        cur = conn.cursor()
-        cur.execute("INSERT INTO foods VALUES ({})".format(food.items()))
-        # enter food data into db here
+        conn = None
+        values = str()
+
+        # generate insert statement
+        for index, value in enumerate(food.values()):
+            if isinstance(value, str):
+                values += ', "{}"'.format(value)
+            else:
+                if index != 0:
+                    values += ", "
+                values += str(value)
+        query = "INSERT INTO foods ({}) VALUES({})".format(Scraper.COLUMN_NAMES, values)
+
+        # try to execute and commit input statement
+        try:
+            conn = sqlite3.connect(self.db)
+            cur = conn.cursor()
+            cur.execute(query)
+            conn.commit()
+        except sqlite3.Error as e:
+            self.logger.error("Error while executing query: {}".format(query))
+            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            if conn:
+                self.logger.error("Rolling back...")
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
 
     def _enqueue_url(self, url: str, func) -> None:
         """
@@ -71,12 +109,23 @@ class Scraper:
         check the database to see if details about a food already exist
         """
         self.logger.food_in_db(url)
+        results = None
+        conn = None
 
-        # open connection to database
-        conn = sqlite3.connect(self.database)
-        cur = conn.cursor()
-        results = cur.execute("SELECT * FROM foods WHERE url = {}".format(url))
-        conn.close()
+        try:
+            conn = sqlite3.connect(self.db)
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
+            results = cur.fetchall()
+        except sqlite3.Error as e:
+            self.logger.error("Error checking if food in database: {}".format(url))
+            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            if conn:
+                self.logger.error("Rolling back...")
+                conn.rollback()
+        finally:
+            if conn:
+                conn.close()
 
         if results:
             return True
@@ -99,4 +148,14 @@ class Scraper:
         use regex to check for bad ingredients in a food
         """
         self.logger.check_ingredients(food)
+
+        # find "main ingredients" - all ingredients before appearance of first vitamin or mineral
+        main_ingredients = Scraper.VITAMINS.split(food["ingredients"].lower(), maxsplit=1)[0]
+        results = Scraper.BAD_INGREDIENTS.findall(main_ingredients)
+
+        if not results:
+            food["fda_guidelines"] = 1
+        else:
+            food["fda_guidelines"] = 0
+
         return food
