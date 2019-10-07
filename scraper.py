@@ -1,6 +1,9 @@
 import re
 import sqlite3
 
+import requests
+from bs4 import BeautifulSoup
+
 from logger import SilentScraperLogger
 
 
@@ -18,7 +21,7 @@ class Scraper:
 
     def __init__(self, max_threads: int, logger_class, database: str):
         self.db: str = database
-        self.queue = []
+        self.queue: set = set()
         self.max_threads: int = max_threads
         self._running_threads: int = 0
 
@@ -31,6 +34,8 @@ class Scraper:
         """
         enqueue all search pages to be scraped on different threads
         """
+        # url for search results containing every dog food
+        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&sort=relevance"
         pass
 
     def _scrape_food(self, url: str) -> dict:
@@ -62,7 +67,30 @@ class Scraper:
         scrape a page of search results and enqueue all foods to be scraped
         """
         self.logger.scrape_search_results(url)
-        # scrape search results URLs here
+
+        # TODO: Use a different header and proxy for each request
+        session = requests.Session()
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:68.0) Gecko/20100101 Firefox/68.0"}
+        soup = None
+
+        try:
+            r = requests.get(url, headers=headers, timeout=1)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.content, 'html.parser')
+        except requests.exceptions.Timeout as e:
+            self.logger.error("Time out while requesting URL: {}".format(url))
+            self.logger.error("REQUESTS ERROR: " + str(e.args))
+            self.logger.error("Skipping URL...")
+            return
+        except requests.exceptions.HTTPError as e:
+            self.logger.error("HTTP Error while requesting URL: {}".format(url))
+            self.logger.error("REQUESTS ERROR: " + str(e.args))
+            self.logger.error("Skipping URL...")
+            return
+
+        for link in soup.find_all('a', 'product'):
+            product_link = "https://www.chewy.com" + link.get("href")
+            self._enqueue_url(product_link, self._check_and_enter_food)
 
     def _enter_in_db(self, food: dict) -> None:
         """
@@ -103,6 +131,7 @@ class Scraper:
         enqueue url to be scraped and scraper function in the scraper queue
         """
         self.logger.enqueue(url, func)
+        self.queue.add((url, func))
 
     def _food_in_db(self, url: str) -> bool:
         """
