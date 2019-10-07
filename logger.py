@@ -5,8 +5,8 @@ import time
 
 
 class ScraperLogger:
-    def __init__(self, scraper):
-        self.scraper = scraper
+    def __init__(self):
+        pass
 
     @staticmethod
     def get_date():
@@ -48,8 +48,8 @@ class SilentScraperLogger(ScraperLogger):
 
 
 class VerboseScraperLogger(ScraperLogger):
-    def __init__(self, scraper):
-        super().__init__(scraper)
+    def __init__(self):
+        super().__init__()
 
         # make directory for logs if it doesn't exist
         if not os.path.exists("logs"):

@@ -22,6 +22,23 @@ class TestScraper(TestCase):
     def test_start(self):
         self.fail()
 
+    def test_check_and_enter_food(self):
+        self.fail()
+
+    def test_scrape_search_results(self):
+        # url for search results containing only 4 foods
+        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cc%3A294%2CFoodFlavor%3ABison&sort=relevance"
+        expected_urls = {("https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
+                          self.s1.check_and_enter_food),
+                         ("https://www.chewy.com/natural-balance-lid-limited/dp/104666",
+                          self.s1.check_and_enter_food),
+                         ("https://www.chewy.com/taste-wild-ancient-prairie-roasted/dp/217982",
+                          self.s1.check_and_enter_food),
+                         ("https://www.chewy.com/rachael-ray-nutrish-peak-natural/dp/181685",
+                          self.s1.check_and_enter_food)}
+        self.s1.scrape_search_results(url)
+        self.assertEqual(self.s1.queue, expected_urls)
+
     def test__scrape_food(self):
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
         test_food1 = {"item_num": 51256,
@@ -87,20 +104,6 @@ class TestScraper(TestCase):
         self.assertEqual(self.s1._scrape_food(url1), test_food1)
         self.assertEqual(self.s1._scrape_food(url2), test_food2)
         
-    def test__scrape_search_results(self):
-        # url for search results containing only 4 foods
-        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cc%3A294%2CFoodFlavor%3ABison&sort=relevance"
-        expected_urls = {("https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
-                          self.s1._check_and_enter_food),
-                         ("https://www.chewy.com/natural-balance-lid-limited/dp/104666",
-                          self.s1._check_and_enter_food),
-                         ("https://www.chewy.com/taste-wild-ancient-prairie-roasted/dp/217982",
-                          self.s1._check_and_enter_food),
-                         ("https://www.chewy.com/rachael-ray-nutrish-peak-natural/dp/181686",
-                          self.s1._check_and_enter_food)}
-        self.s1._scrape_search_results(url)
-        self.assertEqual(self.s1.queue, expected_urls)
-
     def test__enter_in_db(self):
         import time
 
@@ -137,9 +140,6 @@ class TestScraper(TestCase):
         self.assertTrue(self.s1._food_in_db(url="www.test.com/1.html"))
         self.assertFalse(self.s1._food_in_db(url="this entry is not in the database"))
         self.assertFalse(self.s2._food_in_db(url=None))
-
-    def test__check_and_enter_food(self):
-        self.fail()
 
     def test__check_ingredients(self):
         food1 = {"ingredients": "chicken, lentils, potatoes - this one's bad", "fda_guidelines": 0}
