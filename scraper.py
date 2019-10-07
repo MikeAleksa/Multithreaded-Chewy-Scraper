@@ -58,7 +58,7 @@ class Scraper:
             except Exception as e:
                 self.logger.error("Error while processing food at URL: {}".format(url))
                 self.logger.error("ERROR: " + str(e.args))
-                self.logger.error("Skipping food...")
+                self.logger.error("Skipping food...\n")
         return
 
     def scrape_search_results(self, url: str) -> None:
@@ -142,15 +142,15 @@ class Scraper:
         except requests.exceptions.Timeout as e:
             self.logger.error("Time out while requesting URL: {}".format(url))
             self.logger.error("REQUESTS ERROR: " + str(e.args))
-            self.logger.error("Skipping URL...")
+            self.logger.error("Skipping URL...\n")
         except requests.exceptions.HTTPError as e:
             self.logger.error("HTTP Error while requesting URL: {}".format(url))
             self.logger.error("REQUESTS ERROR: " + str(e.args))
-            self.logger.error("Skipping URL...")
+            self.logger.error("Skipping URL...\n")
         except Exception as e:
             self.logger.error("Unknown Error while requesting URL: {}".format(url))
             self.logger.error("ERROR: " + str(e.args))
-            self.logger.error("Skipping URL...")
+            self.logger.error("Skipping URL...\n")
         finally:
             session.close()
         return r
@@ -182,9 +182,9 @@ class Scraper:
             conn.commit()
         except sqlite3.Error as e:
             self.logger.error("Error while executing query: {}".format(query))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            self.logger.error("SQLITE3 ERROR: " + str(e.args) + "\n")
             if conn:
-                self.logger.error("Rolling back...")
+                self.logger.error("Rolling back...\n")
                 conn.rollback()
         finally:
             if conn:
@@ -217,9 +217,9 @@ class Scraper:
             results = cur.fetchall()
         except sqlite3.Error as e:
             self.logger.error("Error checking if food in database: {}".format(url))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            self.logger.error("SQLITE3 ERROR: " + str(e.args) + "\n")
             if conn:
-                self.logger.error("Rolling back...")
+                self.logger.error("Rolling back...\n")
                 conn.rollback()
         finally:
             if conn:

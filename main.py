@@ -7,7 +7,7 @@ INIT_URL = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&sort=relevance"  # cont
 
 
 def main():
-    logger = VerboseScraperLogger()
+    logger = ErrorScraperLogger()
     scraper = Scraper(database=DATABASE, logger=logger, max_threads=THREADS)
     scraper.scrape(url=INIT_URL)
 

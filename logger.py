@@ -47,7 +47,7 @@ class SilentScraperLogger(ScraperLogger):
     pass
 
 
-class VerboseScraperLogger(ScraperLogger):
+class ErrorScraperLogger(ScraperLogger):
     def __init__(self):
         super().__init__()
 
@@ -68,6 +68,11 @@ class VerboseScraperLogger(ScraperLogger):
     def __del__(self):
         self.logfile.close()
 
+    def error(self, msg: str):
+        self.logfile.write("{} - {}\n".format(self.get_time(), msg))
+
+
+class VerboseScraperLogger(ErrorScraperLogger):
     def scrape_food(self, url: str):
         self.logfile.write("{} - Scraping food details from URL: {}\n\n".format(self.get_time(), url))
 
@@ -85,9 +90,6 @@ class VerboseScraperLogger(ScraperLogger):
 
     def check_ingredients(self, food: dict):
         self.logfile.write("{} - Checking ingredients in food: {}\n\n".format(self.get_time(), food))
-
-    def error(self, msg: str):
-        self.logfile.write("{} - {}\n".format(self.get_time(), msg))
 
     def make_request(self, url: str):
         self.logfile.write("{} - Making request for URL: {}\n\n".format(self.get_time(), url))
