@@ -5,7 +5,7 @@ from logger import VerboseScraperLogger
 from scraper import Scraper
 
 
-# TODO: Test Multithreading for race conditions
+# TODO: Test Multi-threading for race conditions
 # TODO: check database concurrency (need locks at all?)
 
 
@@ -28,6 +28,7 @@ class TestScraper(TestCase):
         conn.close()
 
     def test_scrape_food_if_new(self):
+        # TODO: test scrape_food_if_new()
         self.fail()
 
     def test_scrape_search_results(self):
@@ -48,6 +49,7 @@ class TestScraper(TestCase):
         self.assertEqual(generated_jobs, expected_jobs)
 
     def test__scrape_food_details(self):
+        # TODO: test _scrape_food_details()
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
         test_food1 = {"item_num": 51256,
                       "url": "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",

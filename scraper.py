@@ -34,6 +34,12 @@ class Scraper:
         self.rt_lock = threading.Lock()  # lock for _running_threads
 
     def scrape(self, url: str) -> None:
+        # TODO: write comment for method
+        """
+        ...
+        :param url:
+        :return:
+        """
         # TODO: write function to start scraping search pages from initial url and enqueue subsequent pages and found
         #  foods and continue spawning threads to execute jobs from queue while
         pass
@@ -42,7 +48,9 @@ class Scraper:
         """
         check if a food is already in the database
         if it is not, scrape and add to the database
+        :param url: link to page containing food details
         """
+
         if not self._check_db_for_food(url):
             try:
                 food = self._scrape_food_details(url)
@@ -56,7 +64,9 @@ class Scraper:
     def scrape_search_results(self, url: str) -> None:
         """
         scrape a page of search results and enqueue all foods to be scraped
+        :param url: link to one page of search results
         """
+
         self.logger.scrape_search_results(url)
 
         r = self._make_request(url)
@@ -71,6 +81,8 @@ class Scraper:
     def _scrape_food_details(self, url: str) -> dict:
         """
         scrape page for dog food details and return a dict to be added to the db
+        :param url: link to page containing food details
+        :return: dictionary of food details
         """
         self.logger.scrape_food(url)
 
@@ -115,6 +127,11 @@ class Scraper:
         return food
 
     def _make_request(self, url) -> requests.models.Response:
+        """
+        make a request for a web page using a new session header and proxy ip address
+        :param url: link to web page
+        :return: the response object from requests.get(), will be an empty response object if request fails
+        """
         # TODO: Use a different header and proxy for each request
         session = requests.Session()
         headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:68.0) Gecko/20100101 Firefox/68.0"}
@@ -141,6 +158,7 @@ class Scraper:
     def _enter_in_db(self, food: dict) -> None:
         """
         enter a food item into the database
+        :param food: dictionary containing food details to enter into database
         """
         self.logger.enter_in_db(food)
         conn = None
@@ -174,7 +192,9 @@ class Scraper:
 
     def _enqueue_url(self, url: str, func) -> None:
         """
-        enqueue url to be scraped and scraper function in the scraper queue
+        enqueue url to be scraped and scraper function in the scraper queue, for threads to start from
+        :param url: url of page to scrape
+        :param func: scraping method to use on url when job is executed - i.e. search page or food page
         """
         self.logger.enqueue(url, func)
         job = (url, func)
@@ -183,6 +203,8 @@ class Scraper:
     def _check_db_for_food(self, url: str) -> bool:
         """
         check the database to see if details about a food already exist
+        :param url: link to page to check if details already exists in database
+        :return: boolean True or False indicating if food at specified url is already in the database
         """
         self.logger.food_in_db(url)
         results = None
@@ -211,6 +233,8 @@ class Scraper:
     def _check_ingredients(self, food: dict) -> dict:
         """
         use regex to check for bad ingredients in a food
+        :param food: dictionary containing details about food
+        :return: new dictionary containing details about food, updated to reflect if it meets fda guidelines
         """
         self.logger.check_ingredients(food)
 
