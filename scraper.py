@@ -1,5 +1,7 @@
+import queue
 import re
 import sqlite3
+import threading
 
 import requests
 from bs4 import BeautifulSoup
@@ -8,6 +10,7 @@ from logger import ScraperLogger, SilentScraperLogger
 
 
 class Scraper:
+
     COLUMN_NAMES = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
                               "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet", "fda_guidelines"])
 
@@ -17,19 +20,22 @@ class Scraper:
                           '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
                           '(choline)|(lysine)|(taurine)')
 
-    def __init__(self, max_threads: int, database: str, logger: ScraperLogger = SilentScraperLogger()):
+    def __init__(self, database: str, max_threads: int = 5, logger: ScraperLogger = SilentScraperLogger()):
+        # TODO: implement locks in functions
         self.db: str = database
-        self.queue: set = set()
-        self.max_threads: int = max_threads
-        self._running_threads: int = 0
-        self.logger: ScraperLogger = logger
+        self.queue = queue.Queue()
+        self.logger = logger
 
-    def start(self) -> None:
-        """
-        enqueue all search pages to be scraped on different threads
-        """
-        # url for search results containing every dog food
-        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&sort=relevance"
+        self._max_threads = max_threads
+        self._running_threads = 0
+
+        self.db_lock = threading.Lock()  # lock for database connection
+        self.mt_lock = threading.Lock()  # lock for _max_threads
+        self.rt_lock = threading.Lock()  # lock for _running_threads
+
+    def scrape(self, url: str) -> None:
+        # TODO: write function to start scraping search pages from initial url and enqueue subsequent pages and found
+        #  foods and continue spawning threads to execute jobs from queue while
         pass
 
     def scrape_food_if_new(self, url: str) -> None:
@@ -86,6 +92,8 @@ class Scraper:
                 "special_diet": [],
                 "fda_guidelines": 0,
                 }
+
+        # TODO: scrape food details below
 
         # scrape item number
 
@@ -169,7 +177,8 @@ class Scraper:
         enqueue url to be scraped and scraper function in the scraper queue
         """
         self.logger.enqueue(url, func)
-        self.queue.add((url, func))
+        job = (url, func)
+        self.queue.put(job)
 
     def _check_db_for_food(self, url: str) -> bool:
         """

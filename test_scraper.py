@@ -5,6 +5,10 @@ from logger import VerboseScraperLogger
 from scraper import Scraper
 
 
+# TODO: Test Multithreading for race conditions
+# TODO: check database concurrency (need locks at all?)
+
+
 class TestScraper(TestCase):
 
     @classmethod
@@ -12,8 +16,8 @@ class TestScraper(TestCase):
         cls.logger = VerboseScraperLogger()
 
     def setUp(self) -> None:
-        self.s1 = Scraper(1, "test_db.sqlite3", self.logger)
-        self.s2 = Scraper(1, "test_db2.sqlite3", self.logger)
+        self.s1 = Scraper(database="test_db.sqlite3", logger=self.logger)
+        self.s2 = Scraper(database="test_db2.sqlite3", logger=self.logger)
 
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
@@ -23,16 +27,13 @@ class TestScraper(TestCase):
         conn.commit()
         conn.close()
 
-    def test_start(self):
-        self.fail()
-
     def test_scrape_food_if_new(self):
         self.fail()
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
         url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cbrand_facet%3AAdirondack"
-        expected_urls = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/115819",
+        expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/115819",
                           self.s1.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/115810",
                           self.s1.scrape_food_if_new),
@@ -41,7 +42,10 @@ class TestScraper(TestCase):
                          ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/115807",
                           self.s1.scrape_food_if_new)}
         self.s1.scrape_search_results(url)
-        self.assertEqual(self.s1.queue, expected_urls)
+        generated_jobs = set()
+        while not self.s1.queue.empty():
+            generated_jobs.add(self.s1.queue.get())
+        self.assertEqual(generated_jobs, expected_jobs)
 
     def test__scrape_food_details(self):
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
@@ -133,12 +137,13 @@ class TestScraper(TestCase):
         self.assertTrue(self.s1._check_db_for_food(url=str(test_key)))
 
     def test__enqueue_url(self):
-        def dummyFunction():
+        def dummy_function():
             pass
 
-        self.assertNotEqual(self.s1.queue, {('www.test.com', dummyFunction)})
-        self.s1._enqueue_url('www.test.com', dummyFunction)
-        self.assertEqual(self.s1.queue, {('www.test.com', dummyFunction)})
+        self.s1._enqueue_url("www.test.com", dummy_function)
+        url, func = self.s1.queue.get()
+        self.assertEqual(url, "www.test.com")
+        self.assertEqual(func, dummy_function)
 
     def test__check_db_for_food(self):
         self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1.html"))
@@ -161,6 +166,7 @@ class TestScraper(TestCase):
         self.assertEqual(food3['fda_guidelines'], 1)
 
     def test__make_request(self):
+        # TODO: test to make sure headers and IPs are rotating
         r1 = self.s1._make_request("https://www.google.com/")
         r2 = self.s1._make_request("https://www.google.com/notarealsite")
         self.assertEqual(r1.status_code, 200)
