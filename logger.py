@@ -39,6 +39,9 @@ class ScraperLogger:
     def error(self, msg: str):
         pass
 
+    def make_request(self, url: str):
+        pass
+
 
 class SilentScraperLogger(ScraperLogger):
     pass
@@ -85,3 +88,6 @@ class VerboseScraperLogger(ScraperLogger):
 
     def error(self, msg: str):
         self.logfile.write("{} - {}\n".format(self.get_time(), msg))
+
+    def make_request(self, url: str):
+        self.logfile.write("{} - Making request for URL: {}\n\n".format(self.get_time(), url))

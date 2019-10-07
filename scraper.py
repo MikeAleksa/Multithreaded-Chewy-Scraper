@@ -8,16 +8,14 @@ from logger import SilentScraperLogger
 
 
 class Scraper:
-    COLUMNS = ["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
-               "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet", "fda_guidelines", ]
+    COLUMN_NAMES = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
+                              "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet", "fda_guidelines"])
 
-    COLUMN_NAMES = ", ".join(COLUMNS)
+    BAD_INGREDIENTS = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)')
 
-    BAD_INGREDIENTS = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)|(chickpea)')
-
-    VITAMINS = re.compile('(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|' +
-                          '(potassium)|(sodium)|(magnesium)|(sulfer)|(iron)|(iodine)|' +
-                          '(selenium)|(copper)')
+    VITAMINS = re.compile('(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|' +
+                          '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
+                          '(choline)|(lysine)|(taurine)')
 
     def __init__(self, max_threads: int, logger_class, database: str):
         self.db: str = database
@@ -44,22 +42,42 @@ class Scraper:
         """
         self.logger.scrape_food(url)
 
+        r = self._make_request(url)
+        if r.status_code != 200:
+            raise Exception("Error requesting food at URL: {}".format(url))
+
         food = {"item_num": None,
-                "url": None,
+                "url": url,
                 "ingredients": None,
                 "brand": None,
-                "xsm_breed": None,
-                "sm_breed": None,
-                "md_breed": None,
-                "lg_breed": None,
-                "xlg_breed": None,
+                "xsm_breed": 0,
+                "sm_breed": 0,
+                "md_breed": 0,
+                "lg_breed": 0,
+                "xlg_breed": 0,
                 "food_form": None,
                 "lifestage": None,
-                "special_diet": None,
-                "fda_guidelines": None,
+                "special_diet": [],
+                "fda_guidelines": 0,
                 }
 
-        # scrape food data here
+        # scrape item number
+
+        # scrape ingredients
+
+        # scrape brand
+
+        # scrape breed sizes
+
+        # scrape food form
+
+        # scrape lifestage
+
+        # scrape special diets
+
+        # check ingredients for fda guidelines
+        food = self._check_ingredients(food)
+
         return food
 
     def _scrape_search_results(self, url: str) -> None:
@@ -68,29 +86,38 @@ class Scraper:
         """
         self.logger.scrape_search_results(url)
 
+        r = self._make_request(url)
+        if r is None:
+            return
+
+        soup = BeautifulSoup(r.content, 'html.parser')
+        for link in soup.find_all('a', 'product'):
+            product_link = "https://www.chewy.com" + link.get("href")
+            self._enqueue_url(product_link, self._check_and_enter_food)
+
+    def _make_request(self, url) -> requests.models.Response:
         # TODO: Use a different header and proxy for each request
         session = requests.Session()
         headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:68.0) Gecko/20100101 Firefox/68.0"}
-        soup = None
-
+        r = requests.models.Response()
         try:
             r = requests.get(url, headers=headers, timeout=1)
             r.raise_for_status()
-            soup = BeautifulSoup(r.content, 'html.parser')
         except requests.exceptions.Timeout as e:
             self.logger.error("Time out while requesting URL: {}".format(url))
             self.logger.error("REQUESTS ERROR: " + str(e.args))
             self.logger.error("Skipping URL...")
-            return
         except requests.exceptions.HTTPError as e:
             self.logger.error("HTTP Error while requesting URL: {}".format(url))
             self.logger.error("REQUESTS ERROR: " + str(e.args))
             self.logger.error("Skipping URL...")
-            return
-
-        for link in soup.find_all('a', 'product'):
-            product_link = "https://www.chewy.com" + link.get("href")
-            self._enqueue_url(product_link, self._check_and_enter_food)
+        except Exception as e:
+            self.logger.error("Unknown Error while requesting URL: {}".format(url))
+            self.logger.error("ERROR: " + str(e.args))
+            self.logger.error("Skipping URL...")
+        finally:
+            session.close()
+        return r
 
     def _enter_in_db(self, food: dict) -> None:
         """
@@ -167,9 +194,13 @@ class Scraper:
         if it is not, scrape and add to the database
         """
         if not self._food_in_db(url):
-            food = self._scrape_food(url)
-            food = self._check_ingredients(food)
-            self._enter_in_db(food)
+            try:
+                food = self._scrape_food(url)
+                self._enter_in_db(food)
+            except Exception as e:
+                self.logger.error("Error while processing food at URL: {}".format(url))
+                self.logger.error("ERROR: " + str(e.args))
+                self.logger.error("Skipping food...")
         return
 
     def _check_ingredients(self, food: dict) -> dict:
