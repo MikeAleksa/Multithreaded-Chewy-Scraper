@@ -32,14 +32,14 @@ class Scraper:
         url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&sort=relevance"
         pass
 
-    def check_and_enter_food(self, url: str) -> None:
+    def scrape_food_if_new(self, url: str) -> None:
         """
         check if a food is already in the database
         if it is not, scrape and add to the database
         """
-        if not self._food_in_db(url):
+        if not self._check_db_for_food(url):
             try:
-                food = self._scrape_food(url)
+                food = self._scrape_food_details(url)
                 self._enter_in_db(food)
             except Exception as e:
                 self.logger.error("Error while processing food at URL: {}".format(url))
@@ -60,9 +60,9 @@ class Scraper:
         soup = BeautifulSoup(r.content, 'html.parser')
         for link in soup.find_all('a', 'product'):
             product_link = "https://www.chewy.com" + link.get("href")
-            self._enqueue_url(product_link, self.check_and_enter_food)
+            self._enqueue_url(product_link, self.scrape_food_if_new)
 
-    def _scrape_food(self, url: str) -> dict:
+    def _scrape_food_details(self, url: str) -> dict:
         """
         scrape page for dog food details and return a dict to be added to the db
         """
@@ -171,7 +171,7 @@ class Scraper:
         self.logger.enqueue(url, func)
         self.queue.add((url, func))
 
-    def _food_in_db(self, url: str) -> bool:
+    def _check_db_for_food(self, url: str) -> bool:
         """
         check the database to see if details about a food already exist
         """

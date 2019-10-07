@@ -26,24 +26,24 @@ class TestScraper(TestCase):
     def test_start(self):
         self.fail()
 
-    def test_check_and_enter_food(self):
+    def test_scrape_food_if_new(self):
         self.fail()
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
         url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cbrand_facet%3AAdirondack"
         expected_urls = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/115819",
-                          self.s1.check_and_enter_food),
+                          self.s1.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/115810",
-                          self.s1.check_and_enter_food),
+                          self.s1.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp/115822",
-                          self.s1.check_and_enter_food),
+                          self.s1.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/115807",
-                          self.s1.check_and_enter_food)}
+                          self.s1.scrape_food_if_new)}
         self.s1.scrape_search_results(url)
         self.assertEqual(self.s1.queue, expected_urls)
 
-    def test__scrape_food(self):
+    def test__scrape_food_details(self):
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
         test_food1 = {"item_num": 51256,
                       "url": "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
@@ -105,8 +105,8 @@ class TestScraper(TestCase):
                       "fda_guidelines": 0,
                       }
 
-        self.assertEqual(self.s1._scrape_food(url1), test_food1)
-        self.assertEqual(self.s1._scrape_food(url2), test_food2)
+        self.assertEqual(self.s1._scrape_food_details(url1), test_food1)
+        self.assertEqual(self.s1._scrape_food_details(url2), test_food2)
         
     def test__enter_in_db(self):
         import time
@@ -128,9 +128,9 @@ class TestScraper(TestCase):
             "fda_guidelines": 0,
         }
 
-        self.assertFalse(self.s1._food_in_db(url=str(test_key)))
+        self.assertFalse(self.s1._check_db_for_food(url=str(test_key)))
         self.s1._enter_in_db(new_food)
-        self.assertTrue(self.s1._food_in_db(url=str(test_key)))
+        self.assertTrue(self.s1._check_db_for_food(url=str(test_key)))
 
     def test__enqueue_url(self):
         def dummyFunction():
@@ -140,10 +140,10 @@ class TestScraper(TestCase):
         self.s1._enqueue_url('www.test.com', dummyFunction)
         self.assertEqual(self.s1.queue, {('www.test.com', dummyFunction)})
 
-    def test__food_in_db(self):
-        self.assertTrue(self.s1._food_in_db(url="www.test.com/1.html"))
-        self.assertFalse(self.s1._food_in_db(url="this entry is not in the database"))
-        self.assertFalse(self.s2._food_in_db(url=None))
+    def test__check_db_for_food(self):
+        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1.html"))
+        self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database"))
+        self.assertFalse(self.s2._check_db_for_food(url=None))
 
     def test__check_ingredients(self):
         food1 = {"ingredients": "chicken, lentils, potatoes - this one's bad", "fda_guidelines": 0}
