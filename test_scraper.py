@@ -7,9 +7,13 @@ from scraper import Scraper
 
 class TestScraper(TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.logger = VerboseScraperLogger()
+
     def setUp(self) -> None:
-        self.s1 = Scraper(1, VerboseScraperLogger, "test_db.sqlite3")
-        self.s2 = Scraper(1, VerboseScraperLogger, "test_db2.sqlite3")
+        self.s1 = Scraper(1, "test_db.sqlite3", self.logger)
+        self.s2 = Scraper(1, "test_db2.sqlite3", self.logger)
 
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
@@ -27,14 +31,14 @@ class TestScraper(TestCase):
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
-        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cc%3A294%2CFoodFlavor%3ABison&sort=relevance"
-        expected_urls = {("https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
+        url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cbrand_facet%3AAdirondack"
+        expected_urls = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/115819",
                           self.s1.check_and_enter_food),
-                         ("https://www.chewy.com/natural-balance-lid-limited/dp/104666",
+                         ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/115810",
                           self.s1.check_and_enter_food),
-                         ("https://www.chewy.com/taste-wild-ancient-prairie-roasted/dp/217982",
+                         ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp/115822",
                           self.s1.check_and_enter_food),
-                         ("https://www.chewy.com/rachael-ray-nutrish-peak-natural/dp/181685",
+                         ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/115807",
                           self.s1.check_and_enter_food)}
         self.s1.scrape_search_results(url)
         self.assertEqual(self.s1.queue, expected_urls)

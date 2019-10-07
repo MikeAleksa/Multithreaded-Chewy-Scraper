@@ -4,7 +4,7 @@ import sqlite3
 import requests
 from bs4 import BeautifulSoup
 
-from logger import SilentScraperLogger
+from logger import ScraperLogger, SilentScraperLogger
 
 
 class Scraper:
@@ -17,16 +17,12 @@ class Scraper:
                           '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
                           '(choline)|(lysine)|(taurine)')
 
-    def __init__(self, max_threads: int, logger_class, database: str):
+    def __init__(self, max_threads: int, database: str, logger: ScraperLogger = SilentScraperLogger()):
         self.db: str = database
         self.queue: set = set()
         self.max_threads: int = max_threads
         self._running_threads: int = 0
-
-        if logger_class:
-            self.logger = logger_class(self)
-        else:
-            self.logger = SilentScraperLogger(self)
+        self.logger: ScraperLogger = logger
 
     def start(self) -> None:
         """
