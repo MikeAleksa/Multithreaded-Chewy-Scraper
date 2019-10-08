@@ -2,6 +2,7 @@ import queue
 import re
 import sqlite3
 import threading
+from itertools import cycle
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,28 +11,52 @@ from logger import ScraperLogger, SilentScraperLogger
 
 
 class Scraper:
-
-    COLUMN_NAMES = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
-                              "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet", "fda_guidelines"])
-
-    BAD_INGREDIENTS = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)')
-
-    VITAMINS = re.compile('(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|' +
-                          '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
-                          '(choline)|(lysine)|(taurine)')
-
-    def __init__(self, database: str, max_threads: int = 5, logger: ScraperLogger = SilentScraperLogger()):
+    def __init__(self, database: str, max_threads: int = 5, db_connections: int = 5,
+                 logger: ScraperLogger = SilentScraperLogger()):
         # TODO: implement locks in functions
+
+        # set-up for scraping and saving in database
         self.db: str = database
         self.queue = queue.Queue()
         self.logger = logger
 
+        # set-up for multi-threading
         self._max_threads = max_threads
         self._running_threads = 0
-
-        self.db_lock = threading.Lock()  # lock for database connection
         self.mt_lock = threading.Lock()  # lock for _max_threads
         self.rt_lock = threading.Lock()  # lock for _running_threads
+
+        # set up database connection pool
+        self.db_connection_pool = queue.Queue()
+        for _ in range(db_connections):
+            conn = sqlite3.connect(self.db)
+            self.agents.put(conn)
+
+        # set up user agents and proxies for requests
+        self.agents = queue.Queue()
+        self.proxy_pool = cycle(["23.254.228.230", "24.217.192.131:57273", "69.64.87.155:3128"])
+        try:
+            with open('useragents.txt', 'r') as user_agent_file:
+                for user_agent in user_agent_file.readlines():
+                    self.agents.put(user_agent.strip())
+        except FileNotFoundError:
+            self.agents.put("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1")
+
+        # set-up constants and compiled regex patterns
+        self.db_columns = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
+                                     "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet",
+                                     "fda_guidelines"])
+        self.vitamins_pattern = re.compile(
+            '(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|' +
+            '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
+            '(choline)|(lysine)|(taurine)'
+        )
+        self.bad_ingredients_pattern = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)')
+
+    def __del__(self):
+        while not self.db_connection_pool.empty():
+            conn = self.db_connection_pool.get()
+            conn.close()
 
     def scrape(self, url: str) -> None:
         # TODO: write comment for method
@@ -132,13 +157,28 @@ class Scraper:
         :param url: link to web page
         :return: the response object from requests.get(), will be an empty response object if request fails
         """
-        # TODO: Use a different header and proxy for each request
+        # set up headers and proxy
+
+        proxies = self._get_next_proxy()
+        user_agent = self.agents.get()
+        self.agents.put(user_agent)
+
         session = requests.Session()
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:68.0) Gecko/20100101 Firefox/68.0"}
+        session.headers = {"User-Agent": user_agent}
+        session.proxies = proxies
         r = requests.models.Response()
+
+        self.logger.make_request(url, user_agent, proxies)
+
         try:
-            r = requests.get(url, headers=headers, timeout=1)
+            r = session.get(url, timeout=10)
             r.raise_for_status()
+        except requests.exceptions.ProxyError as e:
+            self.logger.error("Proxy Error while requesting URL: {} with PROXY {}".format(url, proxies))
+            self.logger.error("PROXY ERROR: " + str(e.args))
+            self.logger.error("Retrying with new proxy...\n")
+            session.close()
+            return self._make_request(url)
         except requests.exceptions.Timeout as e:
             self.logger.error("Time out while requesting URL: {}".format(url))
             self.logger.error("REQUESTS ERROR: " + str(e.args))
@@ -161,10 +201,9 @@ class Scraper:
         :param food: dictionary containing food details to enter into database
         """
         self.logger.enter_in_db(food)
-        conn = None
-        values = str()
 
         # generate insert statement
+        values = str()
         for index, value in enumerate(food.values()):
             if isinstance(value, str):
                 values += ', "{}"'.format(value)
@@ -172,23 +211,22 @@ class Scraper:
                 if index != 0:
                     values += ", "
                 values += str(value)
-        query = "INSERT INTO foods ({}) VALUES({})".format(Scraper.COLUMN_NAMES, values)
+        query = "INSERT INTO foods ({}) VALUES({})".format(self.db_columns, values)
+
+        conn = self.db_connection_pool.get()
 
         # try to execute and commit input statement
         try:
-            conn = sqlite3.connect(self.db)
             cur = conn.cursor()
             cur.execute(query)
             conn.commit()
         except sqlite3.Error as e:
             self.logger.error("Error while executing query: {}".format(query))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args) + "\n")
-            if conn:
-                self.logger.error("Rolling back...\n")
-                conn.rollback()
+            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            self.logger.error("Rolling back...\n")
+            conn.rollback()
         finally:
-            if conn:
-                conn.close()
+            self.db_connection_pool.put(conn)
 
     def _enqueue_url(self, url: str, func) -> None:
         """
@@ -208,22 +246,19 @@ class Scraper:
         """
         self.logger.food_in_db(url)
         results = None
-        conn = None
+        conn = self.db_connection_pool.get()
 
         try:
-            conn = sqlite3.connect(self.db)
             cur = conn.cursor()
             cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
             results = cur.fetchall()
         except sqlite3.Error as e:
             self.logger.error("Error checking if food in database: {}".format(url))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args) + "\n")
-            if conn:
-                self.logger.error("Rolling back...\n")
-                conn.rollback()
+            self.logger.error("SQLITE3 ERROR: " + str(e.args))
+            self.logger.error("Rolling back...\n")
+            conn.rollback()
         finally:
-            if conn:
-                conn.close()
+            self.db_connection_pool.put(conn)
 
         if results:
             return True
@@ -239,8 +274,8 @@ class Scraper:
         self.logger.check_ingredients(food)
 
         # find "main ingredients" - all ingredients before appearance of first vitamin or mineral
-        main_ingredients = Scraper.VITAMINS.split(food["ingredients"].lower(), maxsplit=1)[0]
-        results = Scraper.BAD_INGREDIENTS.findall(main_ingredients)
+        main_ingredients = self.vitamins_pattern.split(food["ingredients"].lower(), maxsplit=1)[0]
+        results = self.bad_ingredients_pattern.findall(main_ingredients)
 
         if not results:
             food["fda_guidelines"] = 1
@@ -248,3 +283,15 @@ class Scraper:
             food["fda_guidelines"] = 0
 
         return food
+
+    def _get_next_proxy(self) -> dict:
+        """
+        get the next available proxy in the queue
+        :return: a dictionary to use for 'proxies' in requests.get()
+        """
+        proxy = next(self.proxy_pool)
+        proxies = {
+            "http": "http://" + proxy,
+            "https": "https://" + proxy
+        }
+        return proxies

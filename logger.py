@@ -39,7 +39,7 @@ class ScraperLogger:
     def error(self, msg: str):
         pass
 
-    def make_request(self, url: str):
+    def make_request(self, url: str, agent: str, proxies: dict):
         pass
 
 
@@ -91,5 +91,7 @@ class VerboseScraperLogger(ErrorScraperLogger):
     def check_ingredients(self, food: dict):
         self.logfile.write("{} - Checking ingredients in food: {}\n\n".format(self.get_time(), food))
 
-    def make_request(self, url: str):
-        self.logfile.write("{} - Making request for URL: {}\n\n".format(self.get_time(), url))
+    def make_request(self, url: str, agent: str, proxies: dict):
+        self.logfile.write(
+            "{} - Using PROXY: {} to make request for URL: {} using USER AGENT: {}\n\n".format(self.get_time(), proxies,
+                                                                                               url, agent))

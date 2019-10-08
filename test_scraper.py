@@ -1,4 +1,5 @@
 import sqlite3
+import threading
 from unittest import TestCase
 
 from logger import VerboseScraperLogger
@@ -6,7 +7,7 @@ from scraper import Scraper
 
 
 # TODO: Test Multi-threading for race conditions
-# TODO: check database concurrency (need locks at all?)
+# TODO: check database concurrency (need locks at all?) - connection pooling!
 
 
 class TestScraper(TestCase):
@@ -168,8 +169,12 @@ class TestScraper(TestCase):
         self.assertEqual(food3['fda_guidelines'], 1)
 
     def test__make_request(self):
-        # TODO: test to make sure headers and IPs are rotating
+        # TODO: test to make sure IPs are rotating
         r1 = self.s1._make_request("https://www.google.com/")
         r2 = self.s1._make_request("https://www.google.com/notarealsite")
         self.assertEqual(r1.status_code, 200)
         self.assertEqual(r2.status_code, 404)
+
+        for _ in range(10):
+            r = threading.Thread(target=s1._make_request, args=("https://www.google.com/",))
+            self.assertEqual(r.status_code, 200)
