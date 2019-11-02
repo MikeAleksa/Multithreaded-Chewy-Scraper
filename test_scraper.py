@@ -45,8 +45,8 @@ class TestScraper(TestCase):
                           self.s1.scrape_food_if_new)}
         self.s1.scrape_search_results(url)
         generated_jobs = set()
-        while not self.s1.queue.empty():
-            generated_jobs.add(self.s1.queue.get())
+        while not self.s1.scrape_queue.empty():
+            generated_jobs.add(self.s1.scrape_queue.get())
         self.assertEqual(generated_jobs, expected_jobs)
 
     def test__scrape_food_details(self):
@@ -144,7 +144,7 @@ class TestScraper(TestCase):
             pass
 
         self.s1._enqueue_url("www.test.com", dummy_function)
-        url, func = self.s1.queue.get()
+        url, func = self.s1.scrape_queue.get()
         self.assertEqual(url, "www.test.com")
         self.assertEqual(func, dummy_function)
 
@@ -169,12 +169,11 @@ class TestScraper(TestCase):
         self.assertEqual(food3['fda_guidelines'], 1)
 
     def test__make_request(self):
-        # TODO: test to make sure IPs are rotating
         r1 = self.s1._make_request("https://www.google.com/")
         r2 = self.s1._make_request("https://www.google.com/notarealsite")
         self.assertEqual(r1.status_code, 200)
         self.assertEqual(r2.status_code, 404)
 
         for _ in range(10):
-            r = threading.Thread(target=s1._make_request, args=("https://www.google.com/",))
-            self.assertEqual(r.status_code, 200)
+            r = threading.Thread(target=self.s1._make_request, args=("https://www.google.com/",))
+            self.assertEqual(r., 200)

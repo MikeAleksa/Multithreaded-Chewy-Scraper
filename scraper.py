@@ -2,47 +2,35 @@ import queue
 import re
 import sqlite3
 import threading
-from itertools import cycle
 
 import requests
 from bs4 import BeautifulSoup
 
 from logger import ScraperLogger, SilentScraperLogger
+from session_helper.session_helper import SessionHelper
 
 
 class Scraper:
     def __init__(self, database: str, max_threads: int = 5, db_connections: int = 5,
                  logger: ScraperLogger = SilentScraperLogger()):
         # TODO: implement locks in functions
+        # TODO: refactor proxy pool to use a RequestHelper object instead
 
-        # set-up for scraping and saving in database
-        self.db: str = database
-        self.queue = queue.Queue()
         self.logger = logger
-
-        # set-up for multi-threading
         self._max_threads = max_threads
         self._running_threads = 0
-        self.mt_lock = threading.Lock()  # lock for _max_threads
         self.rt_lock = threading.Lock()  # lock for _running_threads
 
-        # set up database connection pool
+        self.scrape_queue = queue.Queue()
+        self.session_helper = SessionHelper()
+
+        self.db: str = database
         self.db_connection_pool = queue.Queue()
         for _ in range(db_connections):
             conn = sqlite3.connect(self.db)
-            self.agents.put(conn)
+            self.db_connection_pool.put(conn)
 
-        # set up user agents and proxies for requests
-        self.agents = queue.Queue()
-        self.proxy_pool = cycle(["23.254.228.230", "24.217.192.131:57273", "69.64.87.155:3128"])
-        try:
-            with open('useragents.txt', 'r') as user_agent_file:
-                for user_agent in user_agent_file.readlines():
-                    self.agents.put(user_agent.strip())
-        except FileNotFoundError:
-            self.agents.put("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1")
-
-        # set-up constants and compiled regex patterns
+        # constants and compiled regex patterns
         self.db_columns = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
                                      "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet",
                                      "fda_guidelines"])
@@ -157,24 +145,15 @@ class Scraper:
         :param url: link to web page
         :return: the response object from requests.get(), will be an empty response object if request fails
         """
-        # set up headers and proxy
-
-        proxies = self._get_next_proxy()
-        user_agent = self.agents.get()
-        self.agents.put(user_agent)
-
-        session = requests.Session()
-        session.headers = {"User-Agent": user_agent}
-        session.proxies = proxies
+        session = self.session_helper.create_session()
         r = requests.models.Response()
-
-        self.logger.make_request(url, user_agent, proxies)
+        self.logger.make_request(url, session.headers['User-Agent'], session.proxies)
 
         try:
             r = session.get(url, timeout=10)
             r.raise_for_status()
         except requests.exceptions.ProxyError as e:
-            self.logger.error("Proxy Error while requesting URL: {} with PROXY {}".format(url, proxies))
+            self.logger.error("Proxy Error while requesting URL: {} with PROXY {}".format(url, session.proxies))
             self.logger.error("PROXY ERROR: " + str(e.args))
             self.logger.error("Retrying with new proxy...\n")
             session.close()
@@ -236,7 +215,7 @@ class Scraper:
         """
         self.logger.enqueue(url, func)
         job = (url, func)
-        self.queue.put(job)
+        self.scrape_queue.put(job)
 
     def _check_db_for_food(self, url: str) -> bool:
         """
@@ -284,14 +263,3 @@ class Scraper:
 
         return food
 
-    def _get_next_proxy(self) -> dict:
-        """
-        get the next available proxy in the queue
-        :return: a dictionary to use for 'proxies' in requests.get()
-        """
-        proxy = next(self.proxy_pool)
-        proxies = {
-            "http": "http://" + proxy,
-            "https": "https://" + proxy
-        }
-        return proxies
