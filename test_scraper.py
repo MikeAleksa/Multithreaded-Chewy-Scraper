@@ -6,10 +6,6 @@ from logger import VerboseScraperLogger
 from scraper import Scraper
 
 
-# TODO: Test Multi-threading for race conditions
-# TODO: check database concurrency (need locks at all?) - connection pooling!
-
-
 class TestScraper(TestCase):
 
     @classmethod
@@ -35,19 +31,24 @@ class TestScraper(TestCase):
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
         url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cbrand_facet%3AAdirondack"
-        expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/115819",
+
+        # dont use 6-digit number after final /dp/ - corresponds to size of product and doesn't reliable return the
+        #   same size; doesn't matter for scraper since we're not looking at price per pound, etc.
+        expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/115810",
+                         ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp/115822",
+                         ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp/",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/115807",
+                         ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/",
                           self.s1.scrape_food_if_new)}
         self.s1.scrape_search_results(url)
         generated_jobs = set()
         while not self.s1.scrape_queue.empty():
-            generated_jobs.add(self.s1.scrape_queue.get())
-        self.assertEqual(generated_jobs, expected_jobs)
+            job = self.s1.scrape_queue.get()
+            job = (job[0][:-6], job[1])
+            generated_jobs.add(job)
+        self.assertEqual(expected_jobs, generated_jobs)
 
     def test__scrape_food_details(self):
         # TODO: test _scrape_food_details()
@@ -112,8 +113,8 @@ class TestScraper(TestCase):
                       "fda_guidelines": 0,
                       }
 
-        self.assertEqual(self.s1._scrape_food_details(url1), test_food1)
-        self.assertEqual(self.s1._scrape_food_details(url2), test_food2)
+        self.assertEqual(test_food1, self.s1._scrape_food_details(url1))
+        self.assertEqual(test_food2, self.s1._scrape_food_details(url2))
         
     def test__enter_in_db(self):
         import time
@@ -145,8 +146,8 @@ class TestScraper(TestCase):
 
         self.s1._enqueue_url("www.test.com", dummy_function)
         url, func = self.s1.scrape_queue.get()
-        self.assertEqual(url, "www.test.com")
-        self.assertEqual(func, dummy_function)
+        self.assertEqual("www.test.com", url)
+        self.assertEqual(dummy_function, func)
 
     def test__check_db_for_food(self):
         self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1.html"))
@@ -164,16 +165,23 @@ class TestScraper(TestCase):
         food2 = self.s1._check_ingredients(food2)
         food3 = self.s1._check_ingredients(food3)
 
-        self.assertEqual(food1['fda_guidelines'], 0)
-        self.assertEqual(food2['fda_guidelines'], 1)
-        self.assertEqual(food3['fda_guidelines'], 1)
+        self.assertEqual(0, food1['fda_guidelines'])
+        self.assertEqual(1, food2['fda_guidelines'])
+        self.assertEqual(1, food3['fda_guidelines'])
 
     def test__make_request(self):
         r1 = self.s1._make_request("https://www.google.com/")
         r2 = self.s1._make_request("https://www.google.com/notarealsite")
-        self.assertEqual(r1.status_code, 200)
-        self.assertEqual(r2.status_code, 404)
+        self.assertEqual(200, r1.status_code)
+        self.assertEqual(404, r2.status_code)
 
+        threads = []
+        results = []
         for _ in range(10):
-            r = threading.Thread(target=self.s1._make_request, args=("https://www.google.com/",))
-            self.assertEqual(r., 200)
+            threads.append(threading.Thread(target=self.s1._make_request, args="https://www.google.com/"))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            results.append(thread.join())
+        for result in results:
+            print(result)
