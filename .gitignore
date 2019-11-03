@@ -1,5 +1,4 @@
 *.sqlite3
 /logs/
-/api_data/
-/api_data/api_data.json
+/api_data.json
 /useragents.txt

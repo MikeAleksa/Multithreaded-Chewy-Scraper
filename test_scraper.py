@@ -51,7 +51,6 @@ class TestScraper(TestCase):
         self.assertEqual(expected_jobs, generated_jobs)
 
     def test__scrape_food_details(self):
-        # TODO: test _scrape_food_details()
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
         test_food1 = {"item_num": 51256,
                       "url": "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
@@ -175,13 +174,14 @@ class TestScraper(TestCase):
         self.assertEqual(200, r1.status_code)
         self.assertEqual(404, r2.status_code)
 
+        # TODO: get return value from threads to check with assertion
         threads = []
         results = []
         for _ in range(10):
-            threads.append(threading.Thread(target=self.s1._make_request, args="https://www.google.com/"))
+            threads.append(threading.Thread(target=self.s1._make_request, args=("https://www.google.com/",)))
         for thread in threads:
             thread.start()
         for thread in threads:
-            results.append(thread.join())
+            thread.join()
         for result in results:
             print(result)

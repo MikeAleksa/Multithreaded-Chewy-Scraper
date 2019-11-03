@@ -1,3 +1,4 @@
+import json
 import queue
 import re
 import sqlite3
@@ -7,7 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from logger import ScraperLogger, SilentScraperLogger
-from session_helper.session_helper import SessionHelper
+from session_builder.session_builder import SessionBuilder
 
 
 class Scraper:
@@ -21,9 +22,28 @@ class Scraper:
         self._running_threads = 0
         self.rt_lock = threading.Lock()  # lock for _running_threads
 
-        # variables for making requests
+        # queue for pending scrape jobs
         self.scrape_queue = queue.Queue()
-        self.session_helper = SessionHelper()
+
+        # read useragents from file for scraping requests - for SessionBuilder()
+        useragents = []
+        try:
+            with open("useragents.txt", "r") as useragent_file:
+                for useragent in useragent_file.readlines():
+                    useragents.append(useragent.strip())
+        except FileNotFoundError:
+            logger.error("Error opening useragents file...")
+
+        # read api url and key from file for proxies - for SessionBuilder()
+        api_data = None
+        try:
+            with open("api_data.json", "r") as api_data_file:
+                api_data = json.load(api_data_file)
+        except FileNotFoundError:
+            logger.error("Error opening api-data file...")
+
+        # create a session helper object for making new sessions using new useragents and proxies
+        self.session_builder = SessionBuilder(api_data=api_data, useragents=useragents)
 
         # variables for managing database and connection pool
         self.db: str = database
@@ -121,8 +141,6 @@ class Scraper:
                 "fda_guidelines": 0,
                 }
 
-        # TODO: scrape food details below
-
         soup = BeautifulSoup(r.content, "html.parser")
         # attributes = soup.find("ul", class_="attributes")
         # for child in attributes.children:
@@ -177,7 +195,7 @@ class Scraper:
         :param url: link to web page
         :return: the response object from requests.get(), will be an empty response object if request fails
         """
-        session = self.session_helper.create_session()
+        session = self.session_builder.create_session()
         r = requests.models.Response()
         self.logger.make_request(url, session.headers["User-Agent"], session.proxies)
 
@@ -294,4 +312,3 @@ class Scraper:
             food["fda_guidelines"] = 0
 
         return food
-
