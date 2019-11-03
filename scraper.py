@@ -13,17 +13,19 @@ from session_helper.session_helper import SessionHelper
 class Scraper:
     def __init__(self, database: str, max_threads: int = 5, db_connections: int = 5,
                  logger: ScraperLogger = SilentScraperLogger()):
-        # TODO: implement locks in functions
-        # TODO: refactor proxy pool to use a RequestHelper object instead
-
+        # TODO: implement locks in functions?
         self.logger = logger
+
+        # variables for multithreading
         self._max_threads = max_threads
         self._running_threads = 0
         self.rt_lock = threading.Lock()  # lock for _running_threads
 
+        # variables for making requests
         self.scrape_queue = queue.Queue()
         self.session_helper = SessionHelper()
 
+        # variables for managing database and connection pool
         self.db: str = database
         self.db_connection_pool = queue.Queue()
         for _ in range(db_connections):
@@ -35,13 +37,14 @@ class Scraper:
                                      "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet",
                                      "fda_guidelines"])
         self.vitamins_pattern = re.compile(
-            '(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|' +
-            '(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|' +
-            '(choline)|(lysine)|(taurine)'
+            "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
+            "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
+            "(choline)|(lysine)|(taurine)"
         )
-        self.bad_ingredients_pattern = re.compile('(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)')
+        self.bad_ingredients_pattern = re.compile("(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)")
 
     def __del__(self):
+        # close all connections in connection pool
         while not self.db_connection_pool.empty():
             conn = self.db_connection_pool.get()
             conn.close()
@@ -86,8 +89,8 @@ class Scraper:
         if r is None:
             return
 
-        soup = BeautifulSoup(r.content, 'html.parser')
-        for link in soup.find_all('a', 'product'):
+        soup = BeautifulSoup(r.content, "html.parser")
+        for link in soup.find_all("a", "product"):
             product_link = "https://www.chewy.com" + link.get("href")
             self._enqueue_url(product_link, self.scrape_food_if_new)
 
@@ -120,19 +123,48 @@ class Scraper:
 
         # TODO: scrape food details below
 
+        soup = BeautifulSoup(r.content, "html.parser")
+        # attributes = soup.find("ul", class_="attributes")
+        # for child in attributes.children:
+        #     for string in child.stripped_strings:
+        #         print(string)
+
         # scrape item number
+        item_num = soup.find("div", string=re.compile("Item Number")).next_sibling.next_sibling.stripped_strings
+        food["item_num"] = int(next(item_num))
 
         # scrape ingredients
+        ingredients = soup.find("span", string=re.compile("Nutritional Info")).next_sibling.next_sibling
+        food["ingredients"] = next(ingredients.p.stripped_strings)
 
         # scrape brand
+        food["brand"] = str(soup.find("span", attrs={"itemprop": "brand"}).string)
 
         # scrape breed sizes
+        breed_sizes = soup.find("div", string=re.compile("Breed Size")).next_sibling.next_sibling.stripped_strings
+        breed_sizes = next(breed_sizes).split(', ')
+        if "Extra Small & Toy Breeds" in breed_sizes:
+            food["xsm_breed"] = 1
+        if "Small Breeds" in breed_sizes:
+            food["sm_breed"] = 1
+        if "Medium Breeds" in breed_sizes:
+            food["md_breed"] = 1
+        if "Large Breeds" in breed_sizes:
+            food["lg_breed"] = 1
+        if "Giant Breeds" in breed_sizes:
+            food["xlg_breed"] = 1
 
         # scrape food form
+        food_form = soup.find("div", string=re.compile("Food Form")).next_sibling.next_sibling.stripped_strings
+        food["food_form"] = next(food_form)
 
         # scrape lifestage
+        lifestage = soup.find("div", string=re.compile("Lifestage")).next_sibling.next_sibling.stripped_strings
+        food["lifestage"] = next(lifestage)
 
         # scrape special diets
+        special_diet = soup.find("div", string=re.compile("Special Diet")).next_sibling.next_sibling.stripped_strings
+        food["special_diet"] = next(special_diet).split(', ')
 
         # check ingredients for fda guidelines
         food = self._check_ingredients(food)
@@ -147,7 +179,7 @@ class Scraper:
         """
         session = self.session_helper.create_session()
         r = requests.models.Response()
-        self.logger.make_request(url, session.headers['User-Agent'], session.proxies)
+        self.logger.make_request(url, session.headers["User-Agent"], session.proxies)
 
         try:
             r = session.get(url, timeout=10)

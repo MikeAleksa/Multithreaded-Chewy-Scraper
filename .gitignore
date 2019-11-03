@@ -1,6 +1,5 @@
-/api_data/proxybonanza_api_key.txt
-/test_db2.sqlite3
-/test_db.sqlite3
+*.sqlite3
 /logs/
 /api_data/
 /api_data/api_data.json
+/useragents.txt
