@@ -43,12 +43,8 @@ class Scraper:
         # create a session helper object for making new sessions using new useragents and proxies
         self.session_builder = SessionBuilder(api_data=api_data, useragents=useragents)
 
-        # variables for managing database and connection pool
+        # variables for managing database connections
         self.db: str = database
-        self.db_connection_pool = queue.Queue()
-        for _ in range(db_connections):
-            conn = sqlite3.connect(self.db)
-            self.db_connection_pool.put(conn)
 
         # constants and compiled regex patterns
         self.db_columns = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
@@ -60,12 +56,6 @@ class Scraper:
             "(choline)|(lysine)|(taurine)"
         )
         self.bad_ingredients_pattern = re.compile("(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)")
-
-    def __del__(self):
-        # close all connections in connection pool
-        while not self.db_connection_pool.empty():
-            conn = self.db_connection_pool.get()
-            conn.close()
 
     def worker(self):
         """
@@ -266,20 +256,17 @@ class Scraper:
                 values += str(value)
         query = "INSERT INTO foods ({}) VALUES({})".format(self.db_columns, values)
 
-        conn = self.db_connection_pool.get()
-
         # try to execute and commit input statement
-        try:
-            cur = conn.cursor()
-            cur.execute(query)
-            conn.commit()
-        except sqlite3.Error as e:
-            self.logger.error("Error while executing query: {}".format(query))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args))
-            self.logger.error("Rolling back...\n")
-            conn.rollback()
-        finally:
-            self.db_connection_pool.put(conn)
+        with sqlite3.connect(self.db) as conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(query)
+                conn.commit()
+            except sqlite3.Error as e:
+                self.logger.error("Error while executing query: {}".format(query))
+                self.logger.error("SQLITE3 ERROR: " + str(e.args))
+                self.logger.error("Rolling back...\n")
+                conn.rollback()
 
     def _enqueue_url(self, url: str, func) -> None:
         """
@@ -299,25 +286,23 @@ class Scraper:
         """
         self.logger.food_in_db(url)
         results = None
-        conn = self.db_connection_pool.get()
 
-        try:
-            cur = conn.cursor()
-            # trim final part of the url path, as it relates to the product size variants,
-            #   which we aren't concerned with
-            cur.execute('SELECT * FROM foods WHERE url LIKE "{}/_____"'.format(url[:-6]))
-            results = cur.fetchall()
-        except sqlite3.Error as e:
-            self.logger.error("Error checking if food in database: {}".format(url))
-            self.logger.error("SQLITE3 ERROR: " + str(e.args))
-            self.logger.error("Rolling back...\n")
-            conn.rollback()
-        except TypeError as e:
-            self.logger.error("Error checking if food in database: {}".format(url))
-            self.logger.error("TypeError: " + str(e.args))
-            self.logger.error("Rolling back...\n")
-        finally:
-            self.db_connection_pool.put(conn)
+        with sqlite3.connect(self.db) as conn:
+            try:
+                cur = conn.cursor()
+                # trim final part of the url path, as it relates to the product size variants,
+                #   which we aren't concerned with
+                cur.execute('SELECT * FROM foods WHERE url LIKE "{}/_____"'.format(url[:-6]))
+                results = cur.fetchall()
+            except sqlite3.Error as e:
+                self.logger.error("Error checking if food in database: {}".format(url))
+                self.logger.error("SQLITE3 ERROR: " + str(e.args))
+                self.logger.error("Rolling back...\n")
+                conn.rollback()
+            except TypeError as e:
+                self.logger.error("Error checking if food in database: {}".format(url))
+                self.logger.error("TypeError: " + str(e.args))
+                self.logger.error("Rolling back...\n")
 
         if results:
             return True
