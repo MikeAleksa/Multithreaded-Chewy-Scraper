@@ -2,7 +2,6 @@ import json
 import queue
 import re
 import sqlite3
-import threading
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,15 +13,10 @@ from session_builder.session_builder import SessionBuilder
 class Scraper:
     def __init__(self, database: str, max_threads: int = 5, db_connections: int = 5,
                  logger: ScraperLogger = SilentScraperLogger()):
-        # TODO: implement locks in functions?
         self.logger = logger
 
-        # variables for multithreading
+        # variables for queue of scraping jobs, multi-threading pool
         self._max_threads = max_threads
-        self._running_threads = 0
-        self.rt_lock = threading.Lock()  # lock for _running_threads
-
-        # queue for pending scrape jobs
         self.scrape_queue = queue.Queue()
 
         # read useragents from file for scraping requests - for SessionBuilder()
@@ -69,16 +63,22 @@ class Scraper:
             conn = self.db_connection_pool.get()
             conn.close()
 
-    def scrape(self, url: str) -> None:
-        # TODO: write comment for method
+    def scrape(self, url: str, pages_of_results: int = 1) -> None:
         """
-        ...
-        :param url:
-        :return:
+        Enqueue jobs to scrape all search pages for dog foods, which subsequently enqueue jobs to scrape food pages
+        :param pages_of_results: the number of pages of search results to scrape through
+        :param url: starting URL for search pages
         """
-        # TODO: write function to start scraping search pages from initial url and enqueue subsequent pages and found
-        #  foods and continue spawning threads to execute jobs from queue while
-        pass
+
+        # enqueue jobs to scrape all pages of search results
+        for i in range(1, pages_of_results + 1):
+            search_url = url + str(i)
+            self._enqueue_url(search_url, self.scrape_search_results)
+
+        while not self.scrape_queue.empty():
+            pass
+
+
 
     def scrape_food_if_new(self, url: str) -> None:
         """
@@ -279,13 +279,19 @@ class Scraper:
 
         try:
             cur = conn.cursor()
-            cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
+            # trim final part of the url path, as it relates to the product size variants,
+            #   which we aren't concerned with
+            cur.execute('SELECT * FROM foods WHERE url LIKE "{}/_____"'.format(url[:-6]))
             results = cur.fetchall()
         except sqlite3.Error as e:
             self.logger.error("Error checking if food in database: {}".format(url))
             self.logger.error("SQLITE3 ERROR: " + str(e.args))
             self.logger.error("Rolling back...\n")
             conn.rollback()
+        except TypeError as e:
+            self.logger.error("Error checking if food in database: {}".format(url))
+            self.logger.error("TypeError: " + str(e.args))
+            self.logger.error("Rolling back...\n")
         finally:
             self.db_connection_pool.put(conn)
 

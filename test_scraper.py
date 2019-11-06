@@ -19,14 +19,14 @@ class TestScraper(TestCase):
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
         cur = conn.cursor()
-        query = 'DELETE FROM foods WHERE url != "www.test.com/1.html"'
+        query = 'DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/_____"'
         cur.execute(query)
         conn.commit()
         conn.close()
 
     def test_scrape_food_if_new(self):
         # TODO: test scrape_food_if_new()
-        self.fail()
+        self.fail("No test written for this method")
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
@@ -119,9 +119,10 @@ class TestScraper(TestCase):
         import time
 
         test_key = hash(time.localtime)
+        test_url = str(test_key) + "/12345"
         new_food = {
             "item_num": test_key,
-            "url": str(test_key),
+            "url": test_url,
             "ingredients": "None",
             "brand": "None",
             "xsm_breed": 0,
@@ -135,9 +136,9 @@ class TestScraper(TestCase):
             "fda_guidelines": 0,
         }
 
-        self.assertFalse(self.s1._check_db_for_food(url=str(test_key)))
+        self.assertFalse(self.s1._check_db_for_food(url=test_url))
         self.s1._enter_in_db(new_food)
-        self.assertTrue(self.s1._check_db_for_food(url=str(test_key)))
+        self.assertTrue(self.s1._check_db_for_food(url=test_url))
 
     def test__enqueue_url(self):
         def dummy_function():
@@ -149,8 +150,8 @@ class TestScraper(TestCase):
         self.assertEqual(dummy_function, func)
 
     def test__check_db_for_food(self):
-        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1.html"))
-        self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database"))
+        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/12345"))
+        self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database/12345"))
         self.assertFalse(self.s2._check_db_for_food(url=None))
 
     def test__check_ingredients(self):
@@ -183,5 +184,3 @@ class TestScraper(TestCase):
             thread.start()
         for thread in threads:
             thread.join()
-        for result in results:
-            print(result)
