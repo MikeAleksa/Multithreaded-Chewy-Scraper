@@ -2,6 +2,8 @@ import json
 import queue
 import re
 import sqlite3
+from threading import Thread
+from time import sleep
 
 import requests
 from bs4 import BeautifulSoup
@@ -11,12 +13,14 @@ from session_builder.session_builder import SessionBuilder
 
 
 class Scraper:
-    def __init__(self, database: str, max_threads: int = 5, db_connections: int = 5,
+    def __init__(self, database: str, num_threads: int = 5, db_connections: int = 5,
                  logger: ScraperLogger = SilentScraperLogger()):
         self.logger = logger
 
-        # variables for queue of scraping jobs, multi-threading pool
-        self._max_threads = max_threads
+        # variables for queue of scraping jobs, thread pool
+        self.threads = []
+        for i in range(num_threads):
+            self.threads.append(Thread(target=self.worker))
         self.scrape_queue = queue.Queue()
 
         # read useragents from file for scraping requests - for SessionBuilder()
@@ -63,22 +67,42 @@ class Scraper:
             conn = self.db_connection_pool.get()
             conn.close()
 
+    def worker(self):
+        """
+        worker to pull jobs off of scrape_queue and execute the job, until queue is empty
+        """
+        while True:
+            job = self.scrape_queue.get()
+            if job is None:
+                break
+            url, scrape_func = job[0], job[1]
+            scrape_func(url)
+            self.scrape_queue.task_done()
+            sleep(5)  # sleep for 5 seconds before making the next request
+
     def scrape(self, url: str, pages_of_results: int = 1) -> None:
         """
         Enqueue jobs to scrape all search pages for dog foods, which subsequently enqueue jobs to scrape food pages
         :param pages_of_results: the number of pages of search results to scrape through
         :param url: starting URL for search pages
         """
-
         # enqueue jobs to scrape all pages of search results
         for i in range(1, pages_of_results + 1):
             search_url = url + str(i)
             self._enqueue_url(search_url, self.scrape_search_results)
 
-        while not self.scrape_queue.empty():
-            pass
+        # start worker threads
+        for thread in self.threads:
+            thread.start()
 
+        # block until scrape queue is empty
+        self.scrape_queue.join()
 
+        # stop workers
+        for _ in self.threads:
+            self.scrape_queue.put(None)
+        for thread in self.threads:
+            thread.join()
 
     def scrape_food_if_new(self, url: str) -> None:
         """
