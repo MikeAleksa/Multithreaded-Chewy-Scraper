@@ -19,17 +19,13 @@ class TestScraper(TestCase):
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
         cur = conn.cursor()
-        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/%";',
+        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/54321";',
                    'DELETE FROM diets;',
                    ]
         for query in queries:
             cur.execute(query)
         conn.commit()
         conn.close()
-
-    def test_scrape_food_if_new(self):
-        # TODO: test scrape_food_if_new()
-        self.fail("No test written for this method")
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
@@ -154,7 +150,7 @@ class TestScraper(TestCase):
         self.assertEqual(dummy_function, func)
 
     def test__check_db_for_food(self):
-        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/1234578565"))
+        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/54321"))
         self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database/12345"))
 
     def test__check_ingredients(self):

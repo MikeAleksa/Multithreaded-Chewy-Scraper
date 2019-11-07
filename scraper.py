@@ -321,17 +321,11 @@ class Scraper:
         self.logger.food_in_db(url)
         results = None
 
-        # trim final part of the url path, as it relates to the product size variants, which we aren't concerned with
-        if url:
-            shortened_url = url.rsplit('/', 1)[0] + "/%"
-        else:
-            raise (Exception('No URL given'))
-
         with sqlite3.connect(self.db) as conn:
             try:
                 cur = conn.cursor()
 
-                cur.execute('SELECT * FROM foods WHERE url LIKE "{}"'.format(shortened_url))
+                cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
                 results = cur.fetchall()
             except sqlite3.Error as e:
                 self.logger.error("Error checking if food in database: {}".format(url))
