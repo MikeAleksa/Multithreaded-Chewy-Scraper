@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 from logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
 
+SLEEP_TIME: int = 3
+
 
 class Scraper:
     def __init__(self, database: str, num_threads: int = 5, db_connections: int = 5,
@@ -67,7 +69,7 @@ class Scraper:
             url, scrape_func = job[0], job[1]
             scrape_func(url)
             self.scrape_queue.task_done()
-            sleep(5)  # sleep for 5 seconds before making the next request
+            sleep(SLEEP_TIME)  # sleep before making the next request
 
     def scrape(self, url: str, pages_of_results: int = 1) -> None:
         """
@@ -108,7 +110,8 @@ class Scraper:
                 self.logger.error("Error while processing food at URL: {}".format(url))
                 self.logger.error("ERROR: " + str(e.args))
                 self.logger.error("Skipping food...\n")
-        return
+        else:
+            self.logger.message("{} is already in the database... skipping...".format(url))
 
     def scrape_search_results(self, url: str) -> None:
         """
@@ -158,7 +161,10 @@ class Scraper:
 
         # scrape item number
         self.logger.message("Scraping Item Number from {}".format(url))
-        item_num = soup.find("div", string=re.compile("Item Number")).next_sibling.next_sibling.stripped_strings
+        item_num = soup.find("div", string=re.compile("Item Number"))
+        item_num = item_num.next_sibling
+        item_num = item_num.next_sibling
+        item_num = item_num.stripped_strings
         food["item_num"] = int(next(item_num))
 
         # scrape ingredients
@@ -198,14 +204,14 @@ class Scraper:
         self.logger.message("Scraping Lifestage from {}".format(url))
         lifestage = soup.find("div", string=re.compile("Lifestage"))
         if lifestage:
-            lifestage.next_sibling.next_sibling.stripped_strings
+            lifestage = lifestage.next_sibling.next_sibling.stripped_strings
             food["lifestage"] = next(lifestage)
 
         # scrape special diets
         self.logger.message("Scraping Special Diets from {}".format(url))
         special_diet = soup.find("div", string=re.compile("Special Diet"))
         if special_diet:
-            special_diet.next_sibling.next_sibling.stripped_strings
+            special_diet = special_diet.next_sibling.next_sibling.stripped_strings
             food["special_diet"] = next(special_diet).split(', ')
 
         # check ingredients for fda guidelines
@@ -315,12 +321,17 @@ class Scraper:
         self.logger.food_in_db(url)
         results = None
 
+        # trim final part of the url path, as it relates to the product size variants, which we aren't concerned with
+        if url:
+            shortened_url = url.rsplit('/', 1)[0] + "/%"
+        else:
+            raise (Exception('No URL given'))
+
         with sqlite3.connect(self.db) as conn:
             try:
                 cur = conn.cursor()
-                # trim final part of the url path, as it relates to the product size variants,
-                #   which we aren't concerned with
-                cur.execute('SELECT * FROM foods WHERE url LIKE "{}/_____"'.format(url[:-6]))
+
+                cur.execute('SELECT * FROM foods WHERE url LIKE "{}"'.format(shortened_url))
                 results = cur.fetchall()
             except sqlite3.Error as e:
                 self.logger.error("Error checking if food in database: {}".format(url))

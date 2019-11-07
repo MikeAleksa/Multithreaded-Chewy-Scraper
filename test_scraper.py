@@ -19,7 +19,7 @@ class TestScraper(TestCase):
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
         cur = conn.cursor()
-        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/_____";',
+        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/%";',
                    'DELETE FROM diets;',
                    ]
         for query in queries:
@@ -35,21 +35,21 @@ class TestScraper(TestCase):
         # url for search results containing only 4 foods
         url = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cbrand_facet%3AAdirondack"
 
-        # dont use 6-digit number after final /dp/ - corresponds to size of product and doesn't reliable return the
+        # dont use number after final /dp/ - corresponds to size of product and doesn't reliable return the
         #   same size; doesn't matter for scraper since we're not looking at price per pound, etc.
-        expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp/",
+        expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp/",
+                         ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp/",
+                         ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp",
                           self.s1.scrape_food_if_new),
-                         ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp/",
+                         ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp",
                           self.s1.scrape_food_if_new)}
         self.s1.scrape_search_results(url)
         generated_jobs = set()
         while not self.s1.scrape_queue.empty():
             job = self.s1.scrape_queue.get()
-            job = (job[0][:-6], job[1])
+            job = (job[0].rsplit('/', 1)[0], job[1])
             generated_jobs.add(job)
         self.assertEqual(expected_jobs, generated_jobs)
 
@@ -154,9 +154,8 @@ class TestScraper(TestCase):
         self.assertEqual(dummy_function, func)
 
     def test__check_db_for_food(self):
-        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/12345"))
+        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/1234578565"))
         self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database/12345"))
-        self.assertFalse(self.s2._check_db_for_food(url=None))
 
     def test__check_ingredients(self):
         food1 = {"ingredients": "chicken, lentils, potatoes - this one's bad", "fda_guidelines": 0}

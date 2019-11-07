@@ -43,7 +43,7 @@ class ScraperLogger:
         pass
 
     def message(self, msg: str):
-        pass
+        self.logfile.write(msg + '\n')
 
 
 class SilentScraperLogger(ScraperLogger):
@@ -100,4 +100,4 @@ class VerboseScraperLogger(ErrorScraperLogger):
                                                                                                url, agent))
 
     def message(self, msg: str):
-        self.logfile.write(msg)
+        self.logfile.write(msg + '\n')
