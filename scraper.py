@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
 
-SLEEP_TIME: int = 6
+SLEEP_TIME: int = 5
 
 
 class Scraper:
@@ -49,8 +49,9 @@ class Scraper:
         self.db: str = database
 
         # constants and compiled regex patterns
-        self.db_columns = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
-                                     "lg_breed", "xlg_breed", "food_form", "lifestage", "fda_guidelines"])
+        self.db_columns = ["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
+                           "lg_breed", "xlg_breed", "food_form", "lifestage", "fda_guidelines"]
+
         self.vitamins_pattern = re.compile(
             "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
             "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
@@ -67,9 +68,10 @@ class Scraper:
             if job is None:
                 break
             url, scrape_func = job[0], job[1]
-            scrape_func(url)
+            job_did_make_request: bool = scrape_func(url)
             self.scrape_queue.task_done()
-            sleep(SLEEP_TIME)  # sleep before making the next request
+            if job_did_make_request is True:
+                sleep(SLEEP_TIME)  # sleep before making the next request, if last job performed a request
 
     def scrape(self, url: str, pages_of_results: int = 1) -> None:
         """
@@ -95,11 +97,12 @@ class Scraper:
         for thread in self.threads:
             thread.join()
 
-    def scrape_food_if_new(self, url: str) -> None:
+    def scrape_food_if_new(self, url: str) -> bool:
         """
         check if a food is already in the database
         if it is not, scrape and add to the database
         :param url: link to page containing food details
+        :return: bool representing whether the job made a request to the website or not
         """
 
         if not self._check_db_for_food(url):
@@ -110,25 +113,30 @@ class Scraper:
                 self.logger.error("Error while processing food at URL: {}".format(url))
                 self.logger.error("ERROR: " + str(e.args))
                 self.logger.error("Skipping food...\n")
+            finally:
+                return True
         else:
             self.logger.message("{} is already in the database... skipping...".format(url))
+            return False
 
-    def scrape_search_results(self, url: str) -> None:
+    def scrape_search_results(self, url: str) -> bool:
         """
         scrape a page of search results and enqueue all foods to be scraped
         :param url: link to one page of search results
+        :return: bool representing whether the job made a request to the website or not
         """
 
         self.logger.scrape_search_results(url)
 
         r = self._make_request(url)
         if r is None:
-            return
+            return False
 
         soup = BeautifulSoup(r.content, "html.parser")
         for link in soup.find_all("a", "product"):
             product_link = "https://www.chewy.com" + link.get("href")
             self._enqueue_url(product_link, self.scrape_food_if_new)
+        return True
 
     def _scrape_food_details(self, url: str) -> dict:
         """
@@ -142,6 +150,7 @@ class Scraper:
         if r.status_code != 200:
             raise Exception("Error requesting food at URL: {}".format(url))
 
+        # keep the same as database column names
         food = {"item_num": None,
                 "url": url,
                 "ingredients": None,
@@ -169,8 +178,15 @@ class Scraper:
 
         # scrape ingredients
         self.logger.message("Scraping Ingredients from {}".format(url))
-        ingredients = soup.find("span", string=re.compile("Nutritional Info")).next_sibling.next_sibling
-        food["ingredients"] = next(ingredients.p.stripped_strings)
+        try:
+            ingredients = soup.find("span", string=re.compile("Nutritional Info")).next_sibling.next_sibling
+            food["ingredients"] = next(ingredients.p.stripped_strings)
+        except Exception as e:
+            ingredients = soup.find("span", string=re.compile("Ingredients")).next_sibling.next_sibling
+            food["ingredients"] = next(ingredients.p.stripped_strings)
+
+        if food["ingredients"] is not None:
+            food["ingredients"] = food["ingredients"].replace('"', '')
 
         # scrape brand
         self.logger.message("Scraping Brand from {}".format(url))
@@ -265,21 +281,15 @@ class Scraper:
         special_diets = food.pop('special_diet')
 
         # generate insert statements
-        values = str()
-        for index, value in enumerate(food.values()):
-            if isinstance(value, str):
-                values += ', "{}"'.format(value)
-            else:
-                if index != 0:
-                    values += ", "
-                values += str(value)
-        food_query = 'INSERT INTO foods ({}) VALUES({})'.format(self.db_columns, values)
+        columns = ", ".join(self.db_columns)
+        value_placeholder = ", ".join([':' + col for col in self.db_columns])
+        food_query = 'INSERT INTO foods ({}) VALUES({})'.format(columns, value_placeholder)
 
         # try to execute and commit input statement for food
         with sqlite3.connect(self.db) as conn:
             try:
                 cur = conn.cursor()
-                cur.execute(food_query)
+                cur.execute(food_query, food)
                 conn.commit()
             except sqlite3.Error as e:
                 self.logger.error("Error while executing query: {}".format(food_query))
@@ -324,7 +334,6 @@ class Scraper:
         with sqlite3.connect(self.db) as conn:
             try:
                 cur = conn.cursor()
-
                 cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
                 results = cur.fetchall()
             except sqlite3.Error as e:
