@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 from logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
 
-SLEEP_TIME: int = 3
+SLEEP_TIME: int = 6
 
 
 class Scraper:
