@@ -48,8 +48,7 @@ class Scraper:
 
         # constants and compiled regex patterns
         self.db_columns = ", ".join(["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
-                                     "lg_breed", "xlg_breed", "food_form", "lifestage", "special_diet",
-                                     "fda_guidelines"])
+                                     "lg_breed", "xlg_breed", "food_form", "lifestage", "fda_guidelines"])
         self.vitamins_pattern = re.compile(
             "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
             "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
@@ -151,15 +150,11 @@ class Scraper:
                 "xlg_breed": 0,
                 "food_form": None,
                 "lifestage": None,
-                "special_diet": [],
                 "fda_guidelines": 0,
+                "special_diet": [],
                 }
 
         soup = BeautifulSoup(r.content, "html.parser")
-        # attributes = soup.find("ul", class_="attributes")
-        # for child in attributes.children:
-        #     for string in child.stripped_strings:
-        #         print(string)
 
         # scrape item number
         item_num = soup.find("div", string=re.compile("Item Number")).next_sibling.next_sibling.stripped_strings
@@ -245,7 +240,10 @@ class Scraper:
         """
         self.logger.enter_in_db(food)
 
-        # generate insert statement
+        # split special diets from food
+        special_diets = food.pop('special_diet')
+
+        # generate insert statements
         values = str()
         for index, value in enumerate(food.values()):
             if isinstance(value, str):
@@ -254,13 +252,28 @@ class Scraper:
                 if index != 0:
                     values += ", "
                 values += str(value)
-        query = "INSERT INTO foods ({}) VALUES({})".format(self.db_columns, values)
+        food_query = 'INSERT INTO foods ({}) VALUES({})'.format(self.db_columns, values)
 
-        # try to execute and commit input statement
+        # try to execute and commit input statement for food
         with sqlite3.connect(self.db) as conn:
             try:
                 cur = conn.cursor()
-                cur.execute(query)
+                cur.execute(food_query)
+                conn.commit()
+            except sqlite3.Error as e:
+                self.logger.error("Error while executing query: {}".format(query))
+                self.logger.error("SQLITE3 ERROR: " + str(e.args))
+                self.logger.error("Rolling back...\n")
+                conn.rollback()
+
+        # try to execute and commit input statement for special diets
+        with sqlite3.connect(self.db) as conn:
+            try:
+                cur = conn.cursor()
+                for diet in special_diets:
+                    diet_query = 'INSERT INTO diets ("diet", "item_num") VALUES ("{}", "{}");'.format(diet,
+                                                                                                      food['item_num'])
+                    cur.execute(diet_query)
                 conn.commit()
             except sqlite3.Error as e:
                 self.logger.error("Error while executing query: {}".format(query))

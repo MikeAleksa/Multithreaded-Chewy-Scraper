@@ -120,6 +120,7 @@ class TestScraper(TestCase):
 
         test_key = hash(time.localtime)
         test_url = str(test_key) + "/12345"
+        test_diets = ['Sensitive Digestion', 'Limited Ingredient Diet', 'No Corn No Wheat No Soy', 'Grain-Free']
         new_food = {
             "item_num": test_key,
             "url": test_url,
@@ -132,8 +133,8 @@ class TestScraper(TestCase):
             "xlg_breed": 0,
             "food_form": "None",
             "lifestage": "None",
-            "special_diet": "None",
             "fda_guidelines": 0,
+            "special_diet": test_diets,
         }
 
         self.assertFalse(self.s1._check_db_for_food(url=test_url))
