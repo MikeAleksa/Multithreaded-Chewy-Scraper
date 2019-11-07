@@ -42,6 +42,9 @@ class ScraperLogger:
     def make_request(self, url: str, agent: str, proxies: dict):
         pass
 
+    def message(self, msg: str):
+        pass
+
 
 class SilentScraperLogger(ScraperLogger):
     pass
@@ -95,3 +98,6 @@ class VerboseScraperLogger(ErrorScraperLogger):
         self.logfile.write(
             "{} - Using PROXY: {} to make request for URL: {} using USER AGENT: {}\n\n".format(self.get_time(), proxies,
                                                                                                url, agent))
+
+    def message(self, msg: str):
+        self.logfile.write(msg)

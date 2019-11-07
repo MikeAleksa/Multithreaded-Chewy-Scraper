@@ -19,8 +19,11 @@ class TestScraper(TestCase):
     def tearDown(self) -> None:
         conn = sqlite3.connect(self.s1.db)
         cur = conn.cursor()
-        query = 'DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/_____"'
-        cur.execute(query)
+        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/_____";',
+                   'DELETE FROM diets;',
+                   ]
+        for query in queries:
+            cur.execute(query)
         conn.commit()
         conn.close()
 

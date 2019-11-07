@@ -157,41 +157,56 @@ class Scraper:
         soup = BeautifulSoup(r.content, "html.parser")
 
         # scrape item number
+        self.logger.message("Scraping Item Number from {}".format(url))
         item_num = soup.find("div", string=re.compile("Item Number")).next_sibling.next_sibling.stripped_strings
         food["item_num"] = int(next(item_num))
 
         # scrape ingredients
+        self.logger.message("Scraping Ingredients from {}".format(url))
         ingredients = soup.find("span", string=re.compile("Nutritional Info")).next_sibling.next_sibling
         food["ingredients"] = next(ingredients.p.stripped_strings)
 
         # scrape brand
+        self.logger.message("Scraping Brand from {}".format(url))
         food["brand"] = str(soup.find("span", attrs={"itemprop": "brand"}).string)
 
         # scrape breed sizes
-        breed_sizes = soup.find("div", string=re.compile("Breed Size")).next_sibling.next_sibling.stripped_strings
-        breed_sizes = next(breed_sizes).split(', ')
-        if "Extra Small & Toy Breeds" in breed_sizes:
-            food["xsm_breed"] = 1
-        if "Small Breeds" in breed_sizes:
-            food["sm_breed"] = 1
-        if "Medium Breeds" in breed_sizes:
-            food["md_breed"] = 1
-        if "Large Breeds" in breed_sizes:
-            food["lg_breed"] = 1
-        if "Giant Breeds" in breed_sizes:
-            food["xlg_breed"] = 1
+        self.logger.message("Scraping Breed Sizes from {}".format(url))
+        breed_sizes = soup.find("div", string=re.compile("Breed Size"))
+        if breed_sizes:
+            breed_sizes = breed_sizes.next_sibling.next_sibling.stripped_strings
+            breed_sizes = next(breed_sizes).split(', ')
+            if "Extra Small & Toy Breeds" in breed_sizes:
+                food["xsm_breed"] = 1
+            if "Small Breeds" in breed_sizes:
+                food["sm_breed"] = 1
+            if "Medium Breeds" in breed_sizes:
+                food["md_breed"] = 1
+            if "Large Breeds" in breed_sizes:
+                food["lg_breed"] = 1
+            if "Giant Breeds" in breed_sizes:
+                food["xlg_breed"] = 1
 
         # scrape food form
-        food_form = soup.find("div", string=re.compile("Food Form")).next_sibling.next_sibling.stripped_strings
-        food["food_form"] = next(food_form)
+        self.logger.message("Scraping Food Form from {}".format(url))
+        food_form = soup.find("div", string=re.compile("Food Form"))
+        if food_form:
+            food_form = food_form.next_sibling.next_sibling.stripped_strings
+            food["food_form"] = next(food_form)
 
         # scrape lifestage
-        lifestage = soup.find("div", string=re.compile("Lifestage")).next_sibling.next_sibling.stripped_strings
-        food["lifestage"] = next(lifestage)
+        self.logger.message("Scraping Lifestage from {}".format(url))
+        lifestage = soup.find("div", string=re.compile("Lifestage"))
+        if lifestage:
+            lifestage.next_sibling.next_sibling.stripped_strings
+            food["lifestage"] = next(lifestage)
 
         # scrape special diets
-        special_diet = soup.find("div", string=re.compile("Special Diet")).next_sibling.next_sibling.stripped_strings
-        food["special_diet"] = next(special_diet).split(', ')
+        self.logger.message("Scraping Special Diets from {}".format(url))
+        special_diet = soup.find("div", string=re.compile("Special Diet"))
+        if special_diet:
+            special_diet.next_sibling.next_sibling.stripped_strings
+            food["special_diet"] = next(special_diet).split(', ')
 
         # check ingredients for fda guidelines
         food = self._check_ingredients(food)
@@ -261,7 +276,7 @@ class Scraper:
                 cur.execute(food_query)
                 conn.commit()
             except sqlite3.Error as e:
-                self.logger.error("Error while executing query: {}".format(query))
+                self.logger.error("Error while executing query: {}".format(food_query))
                 self.logger.error("SQLITE3 ERROR: " + str(e.args))
                 self.logger.error("Rolling back...\n")
                 conn.rollback()
@@ -276,7 +291,7 @@ class Scraper:
                     cur.execute(diet_query)
                 conn.commit()
             except sqlite3.Error as e:
-                self.logger.error("Error while executing query: {}".format(query))
+                self.logger.error("Error while executing query: {}".format(diet_query))
                 self.logger.error("SQLITE3 ERROR: " + str(e.args))
                 self.logger.error("Rolling back...\n")
                 conn.rollback()
