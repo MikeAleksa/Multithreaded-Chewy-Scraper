@@ -2,8 +2,8 @@ import sqlite3
 import threading
 from unittest import TestCase
 
-from logger import VerboseScraperLogger
 from scraper import Scraper
+from scraper_logger import VerboseScraperLogger
 
 
 class TestScraper(TestCase):

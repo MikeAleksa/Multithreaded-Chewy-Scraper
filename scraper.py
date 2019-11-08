@@ -8,7 +8,7 @@ from time import sleep
 import requests
 from bs4 import BeautifulSoup
 
-from logger import ScraperLogger, SilentScraperLogger
+from scraper_logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
 
 SLEEP_TIME: int = 5

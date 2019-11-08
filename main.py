@@ -1,5 +1,5 @@
-from logger import *
 from scraper import Scraper
+from scraper_logger import *
 
 THREADS = 5
 DATABASE = "db.sqlite3"
