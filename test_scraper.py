@@ -39,6 +39,7 @@ class TestScraper(TestCase):
                           self.s.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp",
                           self.s.scrape_food_if_new)}
+
         self.s.scrape_search_results(url)
         generated_jobs = set()
         while not self.s.scrape_queue.empty():
