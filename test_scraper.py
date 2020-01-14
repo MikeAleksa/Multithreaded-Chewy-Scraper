@@ -13,17 +13,15 @@ class TestScraper(TestCase):
         cls.logger = VerboseScraperLogger()
 
     def setUp(self) -> None:
-        self.s1 = Scraper(database="test_db.sqlite3", logger=self.logger)
-        self.s2 = Scraper(database="test_db2.sqlite3", logger=self.logger)
+        self.s = Scraper(database="test_db.sqlite3", logger=self.logger)
 
     def tearDown(self) -> None:
-        conn = sqlite3.connect(self.s1.db)
+        conn = sqlite3.connect(self.s.db)
         cur = conn.cursor()
         queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/54321";',
                    'DELETE FROM diets;',
                    ]
-        for query in queries:
-            cur.execute(query)
+        cur.executemany(queries)
         conn.commit()
         conn.close()
 
@@ -34,17 +32,17 @@ class TestScraper(TestCase):
         # dont use number after final /dp/ - corresponds to size of product and doesn't reliable return the
         #   same size; doesn't matter for scraper since we're not looking at price per pound, etc.
         expected_jobs = {("https://www.chewy.com/adirondack-30-high-fat-puppy/dp",
-                          self.s1.scrape_food_if_new),
+                          self.s.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-26-adult-active-recipe-dry/dp",
-                          self.s1.scrape_food_if_new),
+                          self.s.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-large-breed-recipe-dry-dog/dp",
-                          self.s1.scrape_food_if_new),
+                          self.s.scrape_food_if_new),
                          ("https://www.chewy.com/adirondack-21-adult-everyday-recipe/dp",
-                          self.s1.scrape_food_if_new)}
-        self.s1.scrape_search_results(url)
+                          self.s.scrape_food_if_new)}
+        self.s.scrape_search_results(url)
         generated_jobs = set()
-        while not self.s1.scrape_queue.empty():
-            job = self.s1.scrape_queue.get()
+        while not self.s.scrape_queue.empty():
+            job = self.s.scrape_queue.get()
             job = (job[0].rsplit('/', 1)[0], job[1])
             generated_jobs.add(job)
         self.assertEqual(expected_jobs, generated_jobs)
@@ -111,8 +109,8 @@ class TestScraper(TestCase):
                       "fda_guidelines": 0,
                       }
 
-        self.assertEqual(test_food1, self.s1._scrape_food_details(url1))
-        self.assertEqual(test_food2, self.s1._scrape_food_details(url2))
+        self.assertEqual(test_food1, self.s._scrape_food_details(url1))
+        self.assertEqual(test_food2, self.s._scrape_food_details(url2))
         
     def test__enter_in_db(self):
         import time
@@ -136,22 +134,22 @@ class TestScraper(TestCase):
             "special_diet": test_diets,
         }
 
-        self.assertFalse(self.s1._check_db_for_food(url=test_url))
-        self.s1._enter_in_db(new_food)
-        self.assertTrue(self.s1._check_db_for_food(url=test_url))
+        self.assertFalse(self.s._check_db_for_food(url=test_url))
+        self.s._enter_in_db(new_food)
+        self.assertTrue(self.s._check_db_for_food(url=test_url))
 
     def test__enqueue_url(self):
         def dummy_function():
             pass
 
-        self.s1._enqueue_url("www.test.com", dummy_function)
-        url, func = self.s1.scrape_queue.get()
+        self.s._enqueue_url("www.test.com", dummy_function)
+        url, func = self.s.scrape_queue.get()
         self.assertEqual("www.test.com", url)
         self.assertEqual(dummy_function, func)
 
     def test__check_db_for_food(self):
-        self.assertTrue(self.s1._check_db_for_food(url="www.test.com/1/54321"))
-        self.assertFalse(self.s1._check_db_for_food(url="this entry is not in the database/12345"))
+        self.assertTrue(self.s._check_db_for_food(url="www.test.com/1/54321"))
+        self.assertFalse(self.s._check_db_for_food(url="this entry is not in the database/12345"))
 
     def test__check_ingredients(self):
         food1 = {"ingredients": "chicken, lentils, potatoes - this one's bad", "fda_guidelines": 0}
@@ -160,17 +158,17 @@ class TestScraper(TestCase):
             "ingredients": "this food has good ingredients, vitamins and minerals, then sweet potatoes - it's ok!",
             "fda_guidelines": 0}
 
-        food1 = self.s1._check_ingredients(food1)
-        food2 = self.s1._check_ingredients(food2)
-        food3 = self.s1._check_ingredients(food3)
+        food1 = self.s._check_ingredients(food1)
+        food2 = self.s._check_ingredients(food2)
+        food3 = self.s._check_ingredients(food3)
 
         self.assertEqual(0, food1['fda_guidelines'])
         self.assertEqual(1, food2['fda_guidelines'])
         self.assertEqual(1, food3['fda_guidelines'])
 
     def test__make_request(self):
-        r1 = self.s1._make_request("https://www.google.com/")
-        r2 = self.s1._make_request("https://www.google.com/notarealsite")
+        r1 = self.s._make_request("https://www.google.com/")
+        r2 = self.s._make_request("https://www.google.com/notarealsite")
         self.assertEqual(200, r1.status_code)
         self.assertEqual(404, r2.status_code)
 
@@ -178,7 +176,7 @@ class TestScraper(TestCase):
         threads = []
         results = []
         for _ in range(10):
-            threads.append(threading.Thread(target=self.s1._make_request, args=("https://www.google.com/",)))
+            threads.append(threading.Thread(target=self.s._make_request, args=("https://www.google.com/",)))
         for thread in threads:
             thread.start()
         for thread in threads:
