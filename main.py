@@ -11,7 +11,6 @@ def main():
     scraper = Scraper(database=DATABASE, logger=logger, num_threads=THREADS)
     scraper.scrape(url=SEARCH_URL, pages_of_results=97)
     # TODO: dynamically find pages_of_results
-    # TODO: add last search date to database
     # TODO: make sure multithreading works
 
 

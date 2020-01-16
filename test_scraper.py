@@ -12,6 +12,7 @@ class TestScraper(TestCase):
 
     def setUp(self) -> None:
         self.s = Scraper(database="testscraperdb.cnf", logger=self.logger)
+        self.s._enter_update_time()
 
     def tearDown(self) -> None:
         self.s.engine.dispose()

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
 
 from scraper_logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
@@ -39,6 +40,12 @@ class Diet(Base):
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     diet = sa.Column(sa.String, nullable=False)
     item_num_id = sa.Column(sa.Integer, sa.ForeignKey(Food.item_num))
+
+
+class Update(Base):
+    __tablename__ = 'food_search_scraperupdates'
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    date = sa.Column(sa.DateTime, nullable=False)
 
 
 class Scraper:
@@ -97,6 +104,9 @@ class Scraper:
         :param pages_of_results: the number of pages of search results to scrape through
         :param url: starting URL for search pages
         """
+        # enter time of scrape in database
+        self._enter_update_time()
+
         # enqueue jobs to scrape all pages of search results
         for i in range(1, pages_of_results + 1):
             search_url = url + str(i)
@@ -348,3 +358,15 @@ class Scraper:
             food.fda_guidelines = False
 
         return food
+
+    def _enter_update_time(self) -> None:
+        """
+        enter the date/time of the time the scraper is starting
+        """
+        try:
+            session = self.Session()
+            session.add(Update(date=func.now()))
+            session.commit()
+            session.close()
+        except Exception as e:
+            self.logger.error("Error entering update time: {}".format(e))
