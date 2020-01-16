@@ -38,7 +38,7 @@ class Diet(Base):
     __tablename__ = 'food_search_diet'
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     diet = sa.Column(sa.String, nullable=False)
-    item_num = sa.Column(sa.ForeignKey(Food.item_num))
+    item_num_id = sa.Column(sa.Integer, sa.ForeignKey(Food.item_num))
 
 
 class Scraper:
@@ -125,8 +125,7 @@ class Scraper:
 
         if not self._check_db_for_food(url):
             try:
-                food = self._scrape_food_details(url)
-                self._enter_in_db(food)
+                self._enter_in_db(*self._scrape_food_details(url))
             except Exception as e:
                 self.logger.error("Error while processing food at URL: {}".format(url))
                 self.logger.error("ERROR: " + str(e.args))
@@ -158,9 +157,9 @@ class Scraper:
 
     def _scrape_food_details(self, url: str):
         """
-        scrape page for dog food details and return a dict to be added to the db
+        scrape page for dog food details
         :param url: link to page containing food details
-        :return: dictionary of food details
+        :return: SQLAlchemy ORM object of food details, list of special diets
         """
         self.logger.scrape_food(url)
         food = Food()
@@ -281,47 +280,24 @@ class Scraper:
             session.close()
         return r
 
-    def _enter_in_db(self, food: Food) -> None:
+    def _enter_in_db(self, food: Food, diets: list) -> None:
         """
         enter a food item into the database
-        :param food: dictionary containing food details to enter into database
+        :param food: SQLAlchemy ORM Object containing food details to enter into database
+        :param diets: List of diets to add to the database
         """
-        self.logger.enter_in_db(food)
+        self.logger.enter_in_db(food.url)
 
-        # split special diets from food
-        special_diets = food.pop('special_diet')
-
-        # generate insert statements
-        columns = ", ".join(self.db_columns)
-        value_placeholder = ", ".join([':' + col for col in self.db_columns])
-        food_query = 'INSERT INTO foods ({}) VALUES({})'.format(columns, value_placeholder)
-
-        # try to execute and commit input statement for food
-        with sqlite3.connect(self.db) as conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(food_query, food)
-                conn.commit()
-            except sqlite3.Error as e:
-                self.logger.error("Error while executing query: {}".format(food_query))
-                self.logger.error("SQLITE3 ERROR: " + str(e.args))
-                self.logger.error("Rolling back...\n")
-                conn.rollback()
-
-        # try to execute and commit input statement for special diets
-        with sqlite3.connect(self.db) as conn:
-            try:
-                cur = conn.cursor()
-                for diet in special_diets:
-                    diet_query = 'INSERT INTO diets ("diet", "item_num") VALUES ("{}", "{}");'.format(diet,
-                                                                                                      food['item_num'])
-                    cur.execute(diet_query)
-                conn.commit()
-            except sqlite3.Error as e:
-                self.logger.error("Error while executing query: {}".format(diet_query))
-                self.logger.error("SQLITE3 ERROR: " + str(e.args))
-                self.logger.error("Rolling back...\n")
-                conn.rollback()
+        try:
+            session = self.Session()
+            session.add(food)
+            session.commit()
+            for diet in diets:
+                session.add(Diet(diet=diet, item_num_id=food.item_num))
+            session.commit()
+            session.close()
+        except Exception as e:
+            self.logger.error("Error while inserting food {}: {}".format(food.item_num, e))
 
     def _enqueue_url(self, url: str, func) -> None:
         """

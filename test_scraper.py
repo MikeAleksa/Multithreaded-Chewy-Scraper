@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from scraper import Scraper
+from scraper import Scraper, Food
 from scraper_logger import VerboseScraperLogger
 
 
@@ -116,25 +116,24 @@ class TestScraper(TestCase):
         test_url = str(test_key) + "/12345"
         test_name = str(test_key)
         test_diets = ['Sensitive Digestion', 'Limited Ingredient Diet', 'No Corn No Wheat No Soy', 'Grain-Free']
-        new_food = {
-            "item_num": test_key,
-            "name": test_name,
-            "url": test_url,
-            "ingredients": "None",
-            "brand": "None",
-            "xsm_breed": 0,
-            "sm_breed": 0,
-            "md_breed": 0,
-            "lg_breed": 0,
-            "xlg_breed": 0,
-            "food_form": "None",
-            "lifestage": "None",
-            "fda_guidelines": 0,
-            "special_diet": test_diets,
-        }
+        test_food = Food(
+            item_num=test_key,
+            name=test_name,
+            url=test_url,
+            ingredients="None",
+            brand="None",
+            xsm_breed=False,
+            sm_breed=False,
+            md_breed=False,
+            lg_breed=False,
+            xlg_breed=False,
+            food_form="None",
+            lifestage="None",
+            fda_guidelines=False
+        )
 
         self.assertFalse(self.s._check_db_for_food(url=test_url))
-        self.s._enter_in_db(new_food)
+        self.s._enter_in_db(test_food, test_diets)
         self.assertTrue(self.s._check_db_for_food(url=test_url))
 
     def test__enqueue_url(self):
@@ -151,19 +150,17 @@ class TestScraper(TestCase):
         self.assertFalse(self.s._check_db_for_food(url="this entry is not in the database/12345"))
 
     def test__check_ingredients(self):
-        food1 = {"ingredients": "chicken, lentils, potatoes - this one's bad", "fda_guidelines": 0}
-        food2 = {"ingredients": "just chicken in this food - its good!", "fda_guidelines": 0}
-        food3 = {
-            "ingredients": "this food has good ingredients, vitamins and minerals, then sweet potatoes - it's ok!",
-            "fda_guidelines": 0}
+        food1 = Food(ingredients="chicken, lentils, potatoes - this one's bad")
+        food2 = Food(ingredients="just chicken in this food - its good!")
+        food3 = Food(ingredients="this food has good ingredients, vitamins and minerals, then sweet potatoes - ok!")
 
         food1 = self.s._check_ingredients(food1)
         food2 = self.s._check_ingredients(food2)
         food3 = self.s._check_ingredients(food3)
 
-        self.assertEqual(0, food1['fda_guidelines'])
-        self.assertEqual(1, food2['fda_guidelines'])
-        self.assertEqual(1, food3['fda_guidelines'])
+        self.assertEqual(False, food1.fda_guidelines)
+        self.assertEqual(True, food2.fda_guidelines)
+        self.assertEqual(True, food3.fda_guidelines)
 
     def test__make_request(self):
         r1 = self.s._make_request("https://www.google.com/")

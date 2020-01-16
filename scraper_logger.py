@@ -37,7 +37,7 @@ class ScraperLogger:
     def food_in_db(self, url: str):
         pass
 
-    def enter_in_db(self, food: dict):
+    def enter_in_db(self, food: str):
         pass
 
     def check_ingredients(self, food: str):
@@ -101,7 +101,7 @@ class VerboseScraperLogger(ErrorScraperLogger):
     def scrape_search_results(self, url: str):
         self.logfile.write("{} - Scraping search results from URL: {}\n\n".format(self.get_time(), url))
 
-    def enter_in_db(self, food: dict):
+    def enter_in_db(self, food: str):
         self.logfile.write("{} - Entering food: {} into database...\n\n".format(self.get_time(), food))
 
     def enqueue(self, url: str, func):
