@@ -17,6 +17,8 @@ class SessionBuilder:
     If no API data is supplied for ProxyBonanza, no proxies are used
     """
 
+    no_proxies_acknowledged = False
+
     def __init__(self, api_data: dict = None, useragents: list = None):
         """
         set up cycle of useragents and list of proxies
@@ -33,6 +35,16 @@ class SessionBuilder:
         self.api_data = api_data
         self.proxies = self.get_proxies_from_proxybonanza()
 
+        # if no proxies available, seek acknowledgement to continue without proxies
+        if self.proxies is None and not SessionBuilder.no_proxies_acknowledged:
+            ack = str()
+            while ack.upper() not in ['Y', 'N']:
+                ack = input("No proxies available. Continue without proxies? (Y/N): ")
+            if ack.upper() == 'Y':
+                SessionBuilder.no_proxies_acknowledged = True
+            else:
+                raise Exception('No proxies available, ending...')
+
     def get_proxies_from_proxybonanza(self) -> list:
         """
         Get a list of proxies from proxybonanza using an api-key and an api-url, if supplied
@@ -46,15 +58,15 @@ class SessionBuilder:
                 response.raise_for_status()
             else:
                 proxy_data = json.loads(response.content)["data"]
-                login: str = proxy_data["login"]
-                password: str = proxy_data["password"]
-                proxies = []
-                for proxy in proxy_data["ippacks"]:
-                    ip: str = proxy["ip"]
-                    port: str = str(proxy["port_http"])
-                    full_proxy_string = "http://{}:{}@{}:{}".format(login, password, ip, port)
-                    self.proxies.append({"http": full_proxy_string, "https": full_proxy_string})
-
+                if proxy_data['expiration_date_human'] != 'Expired':
+                    login: str = proxy_data["login"]
+                    password: str = proxy_data["password"]
+                    proxies = []
+                    for proxy in proxy_data["ippacks"]:
+                        ip: str = proxy["ip"]
+                        port: str = str(proxy["port_http"])
+                        full_proxy_string = "http://{}:{}@{}:{}".format(login, password, ip, port)
+                        proxies.append({"http": full_proxy_string, "https": full_proxy_string})
         return proxies
 
     def create_session(self) -> requests.session:
