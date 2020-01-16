@@ -1,5 +1,3 @@
-import sqlite3
-import threading
 from unittest import TestCase
 
 from scraper import Scraper
@@ -13,17 +11,10 @@ class TestScraper(TestCase):
         cls.logger = VerboseScraperLogger()
 
     def setUp(self) -> None:
-        self.s = Scraper(database="test_db.sqlite3", logger=self.logger)
+        self.s = Scraper(database="testscraperdb.cnf", logger=self.logger)
 
     def tearDown(self) -> None:
-        conn = sqlite3.connect(self.s.db)
-        cur = conn.cursor()
-        queries = ['DELETE FROM foods WHERE url NOT LIKE "www.test.com/1/54321";',
-                   'DELETE FROM diets;',
-                   ]
-        cur.executemany(queries)
-        conn.commit()
-        conn.close()
+        self.s.engine.dispose()
 
     def test_scrape_search_results(self):
         # url for search results containing only 4 foods
@@ -51,6 +42,7 @@ class TestScraper(TestCase):
     def test__scrape_food_details(self):
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
         test_food1 = {"item_num": 51256,
+                      "name": "Earthborn Holistic Great Plains Feast Grain-Free Natural Dry Dog Food",
                       "url": "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
                       "ingredients": (
                           "Bison Meal, Peas, Pea Protein, Tapioca, Dried Egg, Canola Oil (preserved with Mixed "
@@ -81,6 +73,7 @@ class TestScraper(TestCase):
 
         url2 = "https://www.chewy.com/natural-balance-lid-limited/dp/104666"
         test_food2 = {"item_num": 76793,
+                      "name": "Natural Balance L.I.D. Limited Ingredient Diets Sweet Potato & Bison Formula Grain-Free Dry Dog Food",
                       "url": "https://www.chewy.com/natural-balance-lid-limited/dp/104666",
                       "ingredients": (
                           "Sweet Potatoes, Bison, Potato Protein, Pea Protein, Canola Oil (Preserved with "
@@ -112,7 +105,7 @@ class TestScraper(TestCase):
 
         self.assertEqual(test_food1, self.s._scrape_food_details(url1))
         self.assertEqual(test_food2, self.s._scrape_food_details(url2))
-        
+
     def test__enter_in_db(self):
         import time
 
@@ -172,13 +165,3 @@ class TestScraper(TestCase):
         r2 = self.s._make_request("https://www.google.com/notarealsite")
         self.assertEqual(200, r1.status_code)
         self.assertEqual(404, r2.status_code)
-
-        # TODO: get return value from threads to check with assertion
-        threads = []
-        results = []
-        for _ in range(10):
-            threads.append(threading.Thread(target=self.s._make_request, args=("https://www.google.com/",)))
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()

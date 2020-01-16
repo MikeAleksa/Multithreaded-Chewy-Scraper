@@ -1,11 +1,11 @@
-import json
 import queue
 import re
-import sqlite3
+from collections import defaultdict
 from threading import Thread
 from time import sleep
 
 import requests
+import sqlalchemy as sa
 from bs4 import BeautifulSoup
 
 from scraper_logger import ScraperLogger, SilentScraperLogger
@@ -15,8 +15,8 @@ SLEEP_TIME: int = 5
 
 
 class Scraper:
-    def __init__(self, database: str, num_threads: int = 5, db_connections: int = 5,
-                 logger: ScraperLogger = SilentScraperLogger()):
+    def __init__(self, database: str, num_threads: int = 5, logger: ScraperLogger = SilentScraperLogger()):
+        # logger
         self.logger = logger
 
         # variables for queue of scraping jobs, thread pool
@@ -25,33 +25,28 @@ class Scraper:
             self.threads.append(Thread(target=self.worker))
         self.scrape_queue = queue.Queue()
 
-        # read useragents from file for scraping requests - for SessionBuilder()
-        useragents = []
-        try:
-            with open("useragents.txt", "r") as useragent_file:
-                for useragent in useragent_file.readlines():
-                    useragents.append(useragent.strip())
-        except FileNotFoundError:
-            logger.error("Error opening useragents file...")
-
-        # read api url and key from file for proxies - for SessionBuilder()
-        api_data = None
-        try:
-            with open("api_data.json", "r") as api_data_file:
-                api_data = json.load(api_data_file)
-        except FileNotFoundError:
-            logger.error("Error opening api-data file...")
-
         # create a session helper object for making new sessions using new useragents and proxies
-        self.session_builder = SessionBuilder(api_data=api_data, useragents=useragents)
+        self.session_builder = SessionBuilder()
 
-        # variables for managing database connections
-        self.db: str = database
+        # open connection to the database
+        db_cnf_values = defaultdict()
+        with open(database) as db_cnf:
+            for line in db_cnf.readlines():
+                key, value = line.split(' = ')
+                db_cnf_values[key] = value.strip()
+        db_url = 'mysql://{}:{}@{}:{}/{}'.format(db_cnf_values['user'],
+                                                 db_cnf_values['password'],
+                                                 db_cnf_values['host'],
+                                                 db_cnf_values['port'],
+                                                 db_cnf_values['database'])
+        self.engine = sa.create_engine(db_url)
+        self.metadata = sa.MetaData(self.engine)
 
-        # constants and compiled regex patterns
-        self.db_columns = ["item_num", "url", "ingredients", "brand", "xsm_breed", "sm_breed", "md_breed",
-                           "lg_breed", "xlg_breed", "food_form", "lifestage", "fda_guidelines"]
+        # use reflection to create models from the database
+        self.foods = sa.Table('food_search_food', self.metadata, autoload=True)
+        self.diets = sa.Table('food_search_diet', self.metadata, autoload=True)
 
+        # compile regex patterns
         self.vitamins_pattern = re.compile(
             "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
             "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
@@ -331,25 +326,16 @@ class Scraper:
         self.logger.food_in_db(url)
         results = None
 
-        with sqlite3.connect(self.db) as conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('SELECT * FROM foods WHERE url = "{}"'.format(url))
-                results = cur.fetchall()
-            except sqlite3.Error as e:
-                self.logger.error("Error checking if food in database: {}".format(url))
-                self.logger.error("SQLITE3 ERROR: " + str(e.args))
-                self.logger.error("Rolling back...\n")
-                conn.rollback()
-            except TypeError as e:
-                self.logger.error("Error checking if food in database: {}".format(url))
-                self.logger.error("TypeError: " + str(e.args))
-                self.logger.error("Rolling back...\n")
+        try:
+            sel = self.foods.select().where(self.foods.c.url == url)
+            results = self.engine.execute(sel)
+        except Exception as e:
+            self.logger.error("Error checking {}: {}".format(url, e))
 
-        if results:
-            return True
-        else:
+        if results.rowcount == 0:
             return False
+        else:
+            return True
 
     def _check_ingredients(self, food: dict) -> dict:
         """
