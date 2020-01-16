@@ -168,3 +168,9 @@ class TestScraper(TestCase):
         r2 = self.s._make_request("https://www.google.com/notarealsite")
         self.assertEqual(200, r1.status_code)
         self.assertEqual(404, r2.status_code)
+
+    def test__pages_of_results(self):
+        results = self.s._pages_of_results('https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&page=1')
+        self.assertEqual(100, results)
+        results = self.s._pages_of_results('https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cc%3A294')
+        self.assertEqual(43, results)

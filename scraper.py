@@ -1,6 +1,7 @@
 import queue
 import re
 from collections import defaultdict
+from math import ceil
 from threading import Thread
 from time import sleep
 
@@ -98,7 +99,7 @@ class Scraper:
             if job_did_make_request is True:
                 sleep(SLEEP_TIME)  # sleep before making the next request, if last job performed a request
 
-    def scrape(self, url: str, pages_of_results: int = 1) -> None:
+    def scrape(self, url: str) -> None:
         """
         Enqueue jobs to scrape all search pages for dog foods, which subsequently enqueue jobs to scrape food pages
         :param pages_of_results: the number of pages of search results to scrape through
@@ -108,7 +109,7 @@ class Scraper:
         self._enter_update_time()
 
         # enqueue jobs to scrape all pages of search results
-        for i in range(1, pages_of_results + 1):
+        for i in range(1, self._pages_of_results(url) + 1):
             search_url = url + str(i)
             self._enqueue_url(search_url, self.scrape_search_results)
 
@@ -370,3 +371,12 @@ class Scraper:
             session.close()
         except Exception as e:
             self.logger.error("Error entering update time: {}".format(e))
+
+    def _pages_of_results(self, url: str):
+        r = self._make_request(url)
+        soup = BeautifulSoup(r.content, "html.parser")
+        results = soup.find("p", "results-count").string
+        results = re.sub('\s+', ' ', results).split()
+        page_size = int(results[2])
+        total_results = int(results[4])
+        return ceil(total_results / page_size)
