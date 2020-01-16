@@ -41,70 +41,73 @@ class TestScraper(TestCase):
 
     def test__scrape_food_details(self):
         url1 = "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412"
-        test_food1 = {"item_num": 51256,
-                      "name": "Earthborn Holistic Great Plains Feast Grain-Free Natural Dry Dog Food",
-                      "url": "https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412",
-                      "ingredients": (
-                          "Bison Meal, Peas, Pea Protein, Tapioca, Dried Egg, Canola Oil (preserved with Mixed "
-                          "Tocopherols), Beef Meal, Pacific Whiting Meal, Pea Starch, Chickpeas, Flaxseed, "
-                          "Alaska Pollock Meal, Natural Flavors, Pea Fiber, Blueberries, Cranberries, Apples, "
-                          "Carrots, Spinach, Salt, Potassium Chloride, Choline Chloride, DL-Methionine, "
-                          "L-Lysine, Taurine, L-Carnitine, Beta-Carotene, Vitamin A Supplement, Vitamin D3 "
-                          "Supplement, Vitamin E Supplement, Zinc Sulfate, Ferrous Sulfate, Niacin, Folic Acid, "
-                          "Biotin, Manganese Sulfate, Copper Sulfate, Calcium Pantothenate, Thiamine Mononitrate, "
-                          "Pyridoxine Hydrochloride, Riboflavin Supplement, L-Ascorbyl-2-Polyphosphate (source of "
-                          "Vitamin C), Zinc Proteinate, Manganese Proteinate, Copper Proteinate, Calcium Iodate, "
-                          "Sodium Selenite, Cobalt Carbonate, Vitamin B12 Supplement, Yucca Schidigera Extract, "
-                          "Rosemary Extract, Dried Enterococcus Faecium Fermentation Product, Dried "
-                          "Lactobacillus Casei Fermentation Product, Dried Lactobacillus Acidophilus "
-                          "Fermentation Product."),
-                      "brand": "Earthborn Holistic",
-                      "xsm_breed": 0,
-                      "sm_breed": 1,
-                      "md_breed": 1,
-                      "lg_breed": 1,
-                      "xlg_breed": 0,
-                      "food_form": "Dry Food",
-                      "lifestage": "Adult",
-                      "special_diet": ["Grain-Free",
-                                       "Gluten Free"],
-                      "fda_guidelines": 0,
-                      }
+        food1, diets1 = self.s._scrape_food_details(url1)
+        self.assertEqual(51256, food1.item_num)
+        self.assertEqual("Earthborn Holistic Great Plains Feast Grain-Free Natural Dry Dog Food", food1.name)
+        self.assertEqual("https://www.chewy.com/earthborn-holistic-great-plains-feast/dp/36412", food1.url)
+        test_ingredients1 = (
+            "Bison Meal, Peas, Pea Protein, Tapioca, Dried Egg, Canola Oil (preserved with Mixed "
+            "Tocopherols), Beef Meal, Pacific Whiting Meal, Pea Starch, Chickpeas, Flaxseed, "
+            "Alaska Pollock Meal, Natural Flavors, Pea Fiber, Blueberries, Cranberries, Apples, "
+            "Carrots, Spinach, Salt, Potassium Chloride, Choline Chloride, DL-Methionine, "
+            "L-Lysine, Taurine, L-Carnitine, Beta-Carotene, Vitamin A Supplement, Vitamin D3 "
+            "Supplement, Vitamin E Supplement, Zinc Sulfate, Ferrous Sulfate, Niacin, Folic Acid, "
+            "Biotin, Manganese Sulfate, Copper Sulfate, Calcium Pantothenate, Thiamine Mononitrate, "
+            "Pyridoxine Hydrochloride, Riboflavin Supplement, L-Ascorbyl-2-Polyphosphate (source of "
+            "Vitamin C), Zinc Proteinate, Manganese Proteinate, Copper Proteinate, Calcium Iodate, "
+            "Sodium Selenite, Cobalt Carbonate, Vitamin B12 Supplement, Yucca Schidigera Extract, "
+            "Rosemary Extract, Dried Enterococcus Faecium Fermentation Product, Dried "
+            "Lactobacillus Casei Fermentation Product, Dried Lactobacillus Acidophilus "
+            "Fermentation Product.")
+        self.assertEqual(test_ingredients1, food1.ingredients)
+        self.assertEqual("Earthborn Holistic", food1.brand)
+        self.assertEqual(None, food1.xsm_breed)
+        self.assertEqual(True, food1.sm_breed)
+        self.assertEqual(True, food1.md_breed)
+        self.assertEqual(True, food1.lg_breed)
+        self.assertEqual(None, food1.xlg_breed)
+        self.assertEqual("Dry Food", food1.food_form)
+        self.assertEqual("Adult", food1.lifestage)
+        self.assertEqual(False, food1.fda_guidelines)
+        test_diets1 = ["Grain-Free",
+                       "Gluten Free"]
+        self.assertEqual(test_diets1, diets1)
 
         url2 = "https://www.chewy.com/natural-balance-lid-limited/dp/104666"
-        test_food2 = {"item_num": 76793,
-                      "name": "Natural Balance L.I.D. Limited Ingredient Diets Sweet Potato & Bison Formula Grain-Free Dry Dog Food",
-                      "url": "https://www.chewy.com/natural-balance-lid-limited/dp/104666",
-                      "ingredients": (
-                          "Sweet Potatoes, Bison, Potato Protein, Pea Protein, Canola Oil (Preserved with "
-                          "Mixed Tocopherols), Dicalcium Phosphate, Natural Flavor, Salmon Oil (Preserved "
-                          "with Mixed Tocopherols), Potato Fiber, Salt, Calcium Carbonate, Flaxseed, "
-                          "DL-Methionine, Minerals (Zinc Amino Acid Chelate, Zinc Sulfate, Ferrous "
-                          "Sulfate, Iron Amino Acid Chelate, Copper Sulfate, Copper Amino Acid Chelate, "
-                          "Sodium Selenite, Manganese Sulfate, Manganese Amino Acid Chelate, Calcium "
-                          "Iodate), Vitamins (Vitamin E Supplement, Niacin, d-Calcium Pantothenate, "
-                          "Vitamin A Supplement, Riboflavin Supplement, Thiamine Mononitrate, Biotin, "
-                          "Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, "
-                          "Folic Acid), Choline Chloride, Taurine, Citric Acid (preservative), Mixed "
-                          "Tocopherols (preservative), Rosemary Extract."),
-                      "brand": "Natural Balance",
-                      "xsm_breed": 0,
-                      "sm_breed": 1,
-                      "md_breed": 1,
-                      "lg_breed": 1,
-                      "xlg_breed": 0,
-                      "food_form": "Dry Food",
-                      "lifestage": "Adult",
-                      "special_diet": [
-                          "Sensitive Digestion",
-                          "Limited Ingredient Diet",
-                          "No Corn No Wheat No Soy",
-                          "Grain-Free"],
-                      "fda_guidelines": 0,
-                      }
-
-        self.assertEqual(test_food1, self.s._scrape_food_details(url1))
-        self.assertEqual(test_food2, self.s._scrape_food_details(url2))
+        food2, diets2 = self.s._scrape_food_details(url2)
+        self.assertEqual(76793, food2.item_num)
+        self.assertEqual(
+            "Natural Balance L.I.D. Limited Ingredient Diets Sweet Potato & Bison Formula Grain-Free Dry Dog Food",
+            food2.name)
+        self.assertEqual("https://www.chewy.com/natural-balance-lid-limited/dp/104666", food2.url)
+        test_ingredients2 = (
+            "Sweet Potatoes, Bison, Potato Protein, Pea Protein, Canola Oil (Preserved with "
+            "Mixed Tocopherols), Dicalcium Phosphate, Natural Flavor, Salmon Oil (Preserved "
+            "with Mixed Tocopherols), Potato Fiber, Salt, Calcium Carbonate, Flaxseed, "
+            "DL-Methionine, Minerals (Zinc Amino Acid Chelate, Zinc Sulfate, Ferrous "
+            "Sulfate, Iron Amino Acid Chelate, Copper Sulfate, Copper Amino Acid Chelate, "
+            "Sodium Selenite, Manganese Sulfate, Manganese Amino Acid Chelate, Calcium "
+            "Iodate), Vitamins (Vitamin E Supplement, Niacin, d-Calcium Pantothenate, "
+            "Vitamin A Supplement, Riboflavin Supplement, Thiamine Mononitrate, Biotin, "
+            "Vitamin B12 Supplement, Pyridoxine Hydrochloride, Vitamin D3 Supplement, "
+            "Folic Acid), Choline Chloride, Taurine, Citric Acid (preservative), Mixed "
+            "Tocopherols (preservative), Rosemary Extract.")
+        self.assertEqual(test_ingredients2, food2.ingredients)
+        self.assertEqual("Natural Balance", food2.brand)
+        self.assertEqual(None, food2.xsm_breed)
+        self.assertEqual(True, food2.sm_breed)
+        self.assertEqual(True, food2.md_breed)
+        self.assertEqual(True, food2.lg_breed)
+        self.assertEqual(None, food2.xlg_breed)
+        self.assertEqual("Dry Food", food2.food_form)
+        self.assertEqual("Adult", food2.lifestage)
+        self.assertEqual(False, food2.fda_guidelines)
+        test_diets2 = [
+            "Sensitive Digestion",
+            "Limited Ingredient Diet",
+            "No Corn No Wheat No Soy",
+            "Grain-Free"]
+        self.assertEqual(test_diets2, diets2)
 
     def test__enter_in_db(self):
         import time

@@ -40,7 +40,7 @@ class ScraperLogger:
     def enter_in_db(self, food: dict):
         pass
 
-    def check_ingredients(self, food: dict):
+    def check_ingredients(self, food: str):
         pass
 
     def error(self, msg: str):
@@ -110,7 +110,7 @@ class VerboseScraperLogger(ErrorScraperLogger):
     def food_in_db(self, url: str):
         self.logfile.write("{} - Checking DB for entry with URL: {}\n\n".format(self.get_time(), url))
 
-    def check_ingredients(self, food: dict):
+    def check_ingredients(self, food: str):
         self.logfile.write("{} - Checking ingredients in food: {}\n\n".format(self.get_time(), food))
 
     def make_request(self, url: str, agent: str, proxies: dict):

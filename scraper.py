@@ -24,11 +24,11 @@ class Food(Base):
     name = sa.Column(sa.String, nullable=False)
     ingredients = sa.Column(sa.String, nullable=False)
     brand = sa.Column(sa.String)
-    xsm_breed = sa.Column(sa.Boolean, nullable=False)
-    sm_breed = sa.Column(sa.Boolean, nullable=False)
-    md_breed = sa.Column(sa.Boolean, nullable=False)
-    lg_breed = sa.Column(sa.Boolean, nullable=False)
-    xlg_breed = sa.Column(sa.Boolean, nullable=False)
+    xsm_breed = sa.Column(sa.Boolean, nullable=False, default=False)
+    sm_breed = sa.Column(sa.Boolean, nullable=False, default=False)
+    md_breed = sa.Column(sa.Boolean, nullable=False, default=False)
+    lg_breed = sa.Column(sa.Boolean, nullable=False, default=False)
+    xlg_breed = sa.Column(sa.Boolean, nullable=False, default=False)
     food_form = sa.Column(sa.String)
     lifestage = sa.Column(sa.String, nullable=False)
     fda_guidelines = sa.Column(sa.Boolean)
@@ -156,36 +156,23 @@ class Scraper:
             self._enqueue_url(product_link, self.scrape_food_if_new)
         return True
 
-    def _scrape_food_details(self, url: str) -> dict:
+    def _scrape_food_details(self, url: str):
         """
         scrape page for dog food details and return a dict to be added to the db
         :param url: link to page containing food details
         :return: dictionary of food details
         """
         self.logger.scrape_food(url)
+        food = Food()
+        diets = []
 
         r = self._make_request(url)
         if r.status_code != 200:
             raise Exception("Error requesting food at URL: {}".format(url))
-
-        # keep the same as database column names
-        food = {"item_num": None,
-                "name": None,
-                "url": url,
-                "ingredients": None,
-                "brand": None,
-                "xsm_breed": 0,
-                "sm_breed": 0,
-                "md_breed": 0,
-                "lg_breed": 0,
-                "xlg_breed": 0,
-                "food_form": None,
-                "lifestage": None,
-                "fda_guidelines": 0,
-                "special_diet": [],
-                }
-
         soup = BeautifulSoup(r.content, "html.parser")
+
+        # add url of food being scraped
+        food.url = url
 
         # scrape item number
         self.logger.message("Scraping Item Number from {}".format(url))
@@ -193,25 +180,28 @@ class Scraper:
         item_num = item_num.next_sibling
         item_num = item_num.next_sibling
         item_num = item_num.stripped_strings
-        food["item_num"] = int(next(item_num))
+        food.item_num = int(next(item_num))
 
         # scrape food name
+        name = soup.find("div", id='product-title')
+        name = name.stripped_strings
+        food.name = next(name)
 
         # scrape ingredients
         self.logger.message("Scraping Ingredients from {}".format(url))
         try:
             ingredients = soup.find("span", string=re.compile("Nutritional Info")).next_sibling.next_sibling
-            food["ingredients"] = next(ingredients.p.stripped_strings)
+            food.ingredients = next(ingredients.p.stripped_strings)
         except Exception as e:
             ingredients = soup.find("span", string=re.compile("Ingredients")).next_sibling.next_sibling
-            food["ingredients"] = next(ingredients.p.stripped_strings)
+            food.ingredients = next(ingredients.p.stripped_strings)
 
-        if food["ingredients"] is not None:
-            food["ingredients"] = food["ingredients"].replace('"', '')
+        if food.ingredients is not None:
+            food.ingredients = food.ingredients.replace('"', '')
 
         # scrape brand
         self.logger.message("Scraping Brand from {}".format(url))
-        food["brand"] = str(soup.find("span", attrs={"itemprop": "brand"}).string)
+        food.brand = str(soup.find("span", attrs={"itemprop": "brand"}).string)
 
         # scrape breed sizes
         self.logger.message("Scraping Breed Sizes from {}".format(url))
@@ -220,41 +210,41 @@ class Scraper:
             breed_sizes = breed_sizes.next_sibling.next_sibling.stripped_strings
             breed_sizes = next(breed_sizes).split(', ')
             if "Extra Small & Toy Breeds" in breed_sizes:
-                food["xsm_breed"] = 1
+                food.xsm_breed = True
             if "Small Breeds" in breed_sizes:
-                food["sm_breed"] = 1
+                food.sm_breed = True
             if "Medium Breeds" in breed_sizes:
-                food["md_breed"] = 1
+                food.md_breed = True
             if "Large Breeds" in breed_sizes:
-                food["lg_breed"] = 1
+                food.lg_breed = True
             if "Giant Breeds" in breed_sizes:
-                food["xlg_breed"] = 1
+                food.xlg_breed = True
 
         # scrape food form
         self.logger.message("Scraping Food Form from {}".format(url))
         food_form = soup.find("div", string=re.compile("Food Form"))
         if food_form:
             food_form = food_form.next_sibling.next_sibling.stripped_strings
-            food["food_form"] = next(food_form)
+            food.food_form = next(food_form)
 
         # scrape lifestage
         self.logger.message("Scraping Lifestage from {}".format(url))
         lifestage = soup.find("div", string=re.compile("Lifestage"))
         if lifestage:
             lifestage = lifestage.next_sibling.next_sibling.stripped_strings
-            food["lifestage"] = next(lifestage)
+            food.lifestage = next(lifestage)
 
         # scrape special diets
         self.logger.message("Scraping Special Diets from {}".format(url))
         special_diet = soup.find("div", string=re.compile("Special Diet"))
         if special_diet:
             special_diet = special_diet.next_sibling.next_sibling.stripped_strings
-            food["special_diet"] = next(special_diet).split(', ')
+            diets = next(special_diet).split(', ')
 
         # check ingredients for fda guidelines
         food = self._check_ingredients(food)
 
-        return food
+        return food, diets
 
     def _make_request(self, url) -> requests.models.Response:
         """
@@ -291,7 +281,7 @@ class Scraper:
             session.close()
         return r
 
-    def _enter_in_db(self, food: dict) -> None:
+    def _enter_in_db(self, food: Food) -> None:
         """
         enter a food item into the database
         :param food: dictionary containing food details to enter into database
@@ -364,21 +354,21 @@ class Scraper:
         else:
             return False
 
-    def _check_ingredients(self, food: dict) -> dict:
+    def _check_ingredients(self, food: Food) -> Food:
         """
         use regex to check for bad ingredients in a food
         :param food: dictionary containing details about food
         :return: new dictionary containing details about food, updated to reflect if it meets fda guidelines
         """
-        self.logger.check_ingredients(food)
+        self.logger.check_ingredients(food.url)
 
         # find "main ingredients" - all ingredients before appearance of first vitamin or mineral
-        main_ingredients = self.vitamins_pattern.split(food["ingredients"].lower(), maxsplit=1)[0]
+        main_ingredients = self.vitamins_pattern.split(food.ingredients.lower(), maxsplit=1)[0]
         results = self.bad_ingredients_pattern.findall(main_ingredients)
 
         if not results:
-            food["fda_guidelines"] = 1
+            food.fda_guidelines = True
         else:
-            food["fda_guidelines"] = 0
+            food.fda_guidelines = False
 
         return food
