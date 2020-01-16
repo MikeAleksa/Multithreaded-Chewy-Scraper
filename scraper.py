@@ -9,7 +9,7 @@ import requests
 import sqlalchemy as sa
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.sql import func
 
 from scraper_logger import ScraperLogger, SilentScraperLogger
@@ -75,7 +75,8 @@ class Scraper:
                                                  db_cnf_values['port'],
                                                  db_cnf_values['database'])
         self.engine = sa.create_engine(db_url)
-        self.Session = sessionmaker(bind=self.engine)
+        self.session_factory = sessionmaker(bind=self.engine)
+        self.Session = scoped_session(self.session_factory)
 
         # compile regex patterns
         self.vitamins_pattern = re.compile(

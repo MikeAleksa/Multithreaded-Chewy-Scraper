@@ -10,7 +10,6 @@ def main():
     logger = VerboseScraperLogger()
     scraper = Scraper(database=DATABASE, logger=logger, num_threads=THREADS)
     scraper.scrape(url=SEARCH_URL)
-    # TODO: make sure multithreading works
 
 
 if __name__ == "__main__":
