@@ -102,7 +102,6 @@ class Scraper:
     def scrape(self, url: str) -> None:
         """
         Enqueue jobs to scrape all search pages for dog foods, which subsequently enqueue jobs to scrape food pages
-        :param pages_of_results: the number of pages of search results to scrape through
         :param url: starting URL for search pages
         """
         # enter time of scrape in database
