@@ -111,9 +111,11 @@ class TestScraper(TestCase):
 
         test_key = hash(time.localtime)
         test_url = str(test_key) + "/12345"
+        test_name = str(test_key)
         test_diets = ['Sensitive Digestion', 'Limited Ingredient Diet', 'No Corn No Wheat No Soy', 'Grain-Free']
         new_food = {
             "item_num": test_key,
+            "name": test_name,
             "url": test_url,
             "ingredients": "None",
             "brand": "None",

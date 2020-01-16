@@ -7,11 +7,38 @@ from time import sleep
 import requests
 import sqlalchemy as sa
 from bs4 import BeautifulSoup
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 from scraper_logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
 
 SLEEP_TIME: int = 5
+Base = declarative_base()
+
+
+class Food(Base):
+    __tablename__ = 'food_search_food'
+    item_num = sa.Column(sa.Integer, primary_key=True)
+    url = sa.Column(sa.String, unique=True)
+    name = sa.Column(sa.String, nullable=False)
+    ingredients = sa.Column(sa.String, nullable=False)
+    brand = sa.Column(sa.String)
+    xsm_breed = sa.Column(sa.Boolean, nullable=False)
+    sm_breed = sa.Column(sa.Boolean, nullable=False)
+    md_breed = sa.Column(sa.Boolean, nullable=False)
+    lg_breed = sa.Column(sa.Boolean, nullable=False)
+    xlg_breed = sa.Column(sa.Boolean, nullable=False)
+    food_form = sa.Column(sa.String)
+    lifestage = sa.Column(sa.String, nullable=False)
+    fda_guidelines = sa.Column(sa.Boolean)
+
+
+class Diet(Base):
+    __tablename__ = 'food_search_diet'
+    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+    diet = sa.Column(sa.String, nullable=False)
+    item_num = sa.Column(sa.ForeignKey(Food.item_num))
 
 
 class Scraper:
@@ -28,7 +55,7 @@ class Scraper:
         # create a session helper object for making new sessions using new useragents and proxies
         self.session_builder = SessionBuilder()
 
-        # open connection to the database
+        # open connection to the database and set up Session factory
         db_cnf_values = defaultdict()
         with open(database) as db_cnf:
             for line in db_cnf.readlines():
@@ -40,11 +67,7 @@ class Scraper:
                                                  db_cnf_values['port'],
                                                  db_cnf_values['database'])
         self.engine = sa.create_engine(db_url)
-        self.metadata = sa.MetaData(self.engine)
-
-        # use reflection to create models from the database
-        self.foods = sa.Table('food_search_food', self.metadata, autoload=True)
-        self.diets = sa.Table('food_search_diet', self.metadata, autoload=True)
+        self.Session = sessionmaker(bind=self.engine)
 
         # compile regex patterns
         self.vitamins_pattern = re.compile(
@@ -147,6 +170,7 @@ class Scraper:
 
         # keep the same as database column names
         food = {"item_num": None,
+                "name": None,
                 "url": url,
                 "ingredients": None,
                 "brand": None,
@@ -170,6 +194,8 @@ class Scraper:
         item_num = item_num.next_sibling
         item_num = item_num.stripped_strings
         food["item_num"] = int(next(item_num))
+
+        # scrape food name
 
         # scrape ingredients
         self.logger.message("Scraping Ingredients from {}".format(url))
@@ -327,15 +353,16 @@ class Scraper:
         results = None
 
         try:
-            sel = self.foods.select().where(self.foods.c.url == url)
-            results = self.engine.execute(sel)
+            session = self.Session()
+            results = session.query(Food).filter_by(url=url).all()
+            session.close()
         except Exception as e:
             self.logger.error("Error checking {}: {}".format(url, e))
 
-        if results.rowcount == 0:
-            return False
-        else:
+        if results:
             return True
+        else:
+            return False
 
     def _check_ingredients(self, food: dict) -> dict:
         """
