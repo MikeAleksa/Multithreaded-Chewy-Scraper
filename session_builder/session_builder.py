@@ -19,20 +19,26 @@ class SessionBuilder:
 
     no_proxies_acknowledged = False
 
-    def __init__(self, api_data: dict = None, useragents: list = None):
+    def __init__(self):
         """
         set up cycle of useragents and list of proxies
-        :param api_data: dict containing api_key and api_url from proxybonanza
-        :param useragents: list of browser useragents
         """
         # set up useragents
-        if useragents is not None:
-            self.useragents = cycle(useragents)
-        else:
+        try:
+            with open("useragents.txt", "r") as useragent_file:
+                useragents = list()
+                for useragent in useragent_file.readlines():
+                    useragents.append(useragent)
+                self.useragents = cycle(useragents)
+        except FileNotFoundError:
             self.useragents = cycle(["Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"])
 
-        # set up proxies using api-url and api-key for proxybonanza if supplied
-        self.api_data = api_data
+        # set up proxies from proxybonanza, if credentials supplied
+        try:
+            with open("session_builder/api_data.json", "r") as api_data_file:
+                self.api_data = json.load(api_data_file)
+        except FileNotFoundError:
+            self.api_data = None
         self.proxies = self.get_proxies_from_proxybonanza()
 
         # if no proxies available, seek acknowledgement to continue without proxies
