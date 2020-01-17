@@ -7,7 +7,7 @@ SEARCH_URL = "https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&page="  # contains al
 
 
 def main():
-    logger = ErrorScraperLogger()
+    logger = VerboseScraperLogger()
     scraper = Scraper(database=DATABASE, logger=logger, num_threads=THREADS)
     scraper.scrape(url=SEARCH_URL)
 

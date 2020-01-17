@@ -1,6 +1,7 @@
 import queue
 import re
 from collections import defaultdict
+from datetime import datetime
 from math import ceil
 from threading import Thread
 from time import sleep
@@ -10,7 +11,6 @@ import sqlalchemy as sa
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.sql import func
 
 from scraper_logger import ScraperLogger, SilentScraperLogger
 from session_builder.session_builder import SessionBuilder
@@ -368,7 +368,7 @@ class Scraper:
         """
         db_session = self.Session()
         try:
-            db_session.add(Update(date=func.now()))
+            db_session.add(Update(date=datetime.utcnow()))
             db_session.commit()
         except Exception as e:
             db_session.rollback()
