@@ -20,6 +20,9 @@ Base = declarative_base()
 
 
 class Food(Base):
+    """
+    SQLAlchemy model for a food
+    """
     __tablename__ = 'food_search_food'
     item_num = sa.Column(sa.Integer, primary_key=True)
     url = sa.Column(sa.String, unique=True)
@@ -37,6 +40,9 @@ class Food(Base):
 
 
 class Diet(Base):
+    """
+    SQLAlchemy model for a special diet
+    """
     __tablename__ = 'food_search_diet'
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     diet = sa.Column(sa.String, nullable=False)
@@ -44,23 +50,32 @@ class Diet(Base):
 
 
 class Update(Base):
+    """
+    SQLAlchemy model for scraper update date/time
+    """
     __tablename__ = 'food_search_scraperupdates'
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     date = sa.Column(sa.DateTime, nullable=False)
 
 
 class Scraper:
+    """
+    A multithreaded scraper for Chewy.com - pages to scrape are enqueued to be serviced by a pool of worker threads
+    """
+
     def __init__(self, database: str, num_threads: int = 5, logger: ScraperLogger = SilentScraperLogger()):
         # logger
         self.logger = logger
 
-        # variables for queue of scraping jobs, thread pool
+        # queue of scraping jobs
+        self.scrape_queue = queue.Queue()
+
+        # thread pool
         self.threads = []
         for i in range(num_threads):
             self.threads.append(Thread(target=self.worker))
-        self.scrape_queue = queue.Queue()
 
-        # create a session helper object for making new sessions using new useragents and proxies
+        # session helper object for making new sessions using a cycle of useragents and proxies
         self.session_builder = SessionBuilder()
 
         # open connection to the database and set up Session factory
@@ -78,7 +93,7 @@ class Scraper:
         self.session_factory = sessionmaker(bind=self.engine)
         self.Session = scoped_session(self.session_factory)
 
-        # compile regex patterns
+        # compile regex patterns for identifying bad foods
         self.vitamins_pattern = re.compile(
             "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
             "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
@@ -128,8 +143,7 @@ class Scraper:
 
     def scrape_food_if_new(self, url: str) -> bool:
         """
-        check if a food is already in the database
-        if it is not, scrape and add to the database
+        check if a food is already in the database - if it is not, scrape and add to the database
         :param url: link to page containing food details
         :return: bool representing whether the job made a request to the website or not
         """
@@ -170,12 +184,13 @@ class Scraper:
         """
         scrape page for dog food details
         :param url: link to page containing food details
-        :return: SQLAlchemy ORM object of food details, list of special diets
+        :return: Food object of food details, list of special diets
         """
         self.logger.scrape_food(url)
         food = Food()
         diets = []
 
+        # make request and soup
         r = self._make_request(url)
         if r.status_code != 200:
             raise Exception("Error requesting food at URL: {}".format(url))
@@ -294,8 +309,8 @@ class Scraper:
     def _enter_in_db(self, food: Food, diets: list) -> None:
         """
         enter a food item into the database
-        :param food: SQLAlchemy ORM Object containing food details to enter into database
-        :param diets: List of diets to add to the database
+        :param food: Food object containing food details to enter into database
+        :param diets: List of associated diets to add to the database
         """
         self.logger.enter_in_db(food.url)
         db_session = self.Session()
@@ -364,7 +379,7 @@ class Scraper:
 
     def _enter_update_time(self) -> None:
         """
-        enter the date/time of the time the scraper is starting
+        enter the date/time the scraper is starting in the database
         """
         db_session = self.Session()
         try:
@@ -376,7 +391,12 @@ class Scraper:
         finally:
             db_session.close()
 
-    def _pages_of_results(self, url: str):
+    def _pages_of_results(self, url: str) -> int:
+        """
+        return the total number of pages of results for a search
+        :param url: the url of the initial (or any) search page
+        :return: the number of pages of results
+        """
         r = self._make_request(url)
         soup = BeautifulSoup(r.content, "html.parser")
         results = soup.find("p", "results-count").string
