@@ -298,17 +298,18 @@ class Scraper:
         :param diets: List of diets to add to the database
         """
         self.logger.enter_in_db(food.url)
-
+        db_session = self.Session()
         try:
-            session = self.Session()
-            session.add(food)
-            session.commit()
+            db_session.add(food)
+            db_session.commit()
             for diet in diets:
-                session.add(Diet(diet=diet, item_num_id=food.item_num))
-            session.commit()
-            session.close()
+                db_session.add(Diet(diet=diet, item_num_id=food.item_num))
+            db_session.commit()
         except Exception as e:
+            db_session.rollback()
             self.logger.error("Error while inserting food {}: {}".format(food.item_num, e))
+        finally:
+            db_session.close()
 
     def _enqueue_url(self, url: str, func) -> None:
         """
@@ -328,13 +329,14 @@ class Scraper:
         """
         self.logger.food_in_db(url)
         results = None
-
+        db_session = self.Session()
         try:
-            session = self.Session()
-            results = session.query(Food).filter_by(url=url).all()
-            session.close()
+            results = db_session.query(Food).filter_by(url=url).all()
         except Exception as e:
             self.logger.error("Error checking {}: {}".format(url, e))
+            db_session.rollback()
+        finally:
+            db_session.close()
 
         if results:
             return True
@@ -364,13 +366,15 @@ class Scraper:
         """
         enter the date/time of the time the scraper is starting
         """
+        db_session = self.Session()
         try:
-            session = self.Session()
-            session.add(Update(date=func.now()))
-            session.commit()
-            session.close()
+            db_session.add(Update(date=func.now()))
+            db_session.commit()
         except Exception as e:
+            db_session.rollback()
             self.logger.error("Error entering update time: {}".format(e))
+        finally:
+            db_session.close()
 
     def _pages_of_results(self, url: str):
         r = self._make_request(url)
