@@ -56,6 +56,7 @@ class Update(Base):
     __tablename__ = 'food_search_scraperupdates'
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     date = sa.Column(sa.DateTime, nullable=False)
+    count = sa.Column(sa.Integer, nullable=False)
 
 
 class Scraper:
@@ -95,11 +96,14 @@ class Scraper:
 
         # compile regex patterns for identifying bad foods
         self.vitamins_pattern = re.compile(
-            "(mineral)|(vitamin)|(zinc)|(supplement)|(calcium)|(phosphorus)|(potassium)|(sodium)|" +
-            "(magnesium)|(sulfer)|(sulfur)|(iron)|(iodine)|(selenium)|(copper)|(salt)|(chloride)|" +
-            "(choline)|(lysine)|(taurine)"
+            "(mineral|vitamin|zinc|supplement|calcium|phosphorus|potassium|sodium|" +
+            "magnesium|sulfer|sulfur|iron|iodine|selenium|copper|salt|chloride|" +
+            "choline|lysine|taurine)", flags=re.I
         )
-        self.bad_ingredients_pattern = re.compile("(pea)|(bean)|(lentil)|(potato)|(seed)|(soy)")
+        self.bad_ingredients_pattern = re.compile(
+            "(chickpeas|chickpea|peanuts|peanut|pea |peas|pea$| pea |beans|bean|" +
+            "lentils|lentil|potatoes|potato|flaxseeds|flaxseed|flax seed|flax seeds|seeds|seed|soy)",
+            flags=re.I)
 
     def worker(self):
         """
