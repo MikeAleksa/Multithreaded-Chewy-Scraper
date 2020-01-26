@@ -125,7 +125,16 @@ class Scraper:
         :param url: starting URL for search pages
         """
         # enter time of scrape in database
-        self._enter_update_time()
+        total_food_count = self._get_total_food_count(url + '1')
+
+        # quit scraper if no new foods on Chewy.com, otherwise continue
+        if self._new_total_count_greaterthan_last(total_food_count):
+            self._enter_update_time_and_count(self._get_total_food_count(url + '1'))
+            self.logger.message('New Foods Found... Beginning Scraping...')
+        else:
+            self._enter_update_time_and_count(self._get_total_food_count(url + '1'))
+            self.logger.message('No New Foods To Scrape... Exiting...')
+            return
 
         # enqueue jobs to scrape all pages of search results
         for i in range(1, self._pages_of_results(url) + 1):
@@ -381,19 +390,29 @@ class Scraper:
 
         return food
 
-    def _enter_update_time(self) -> None:
+    def _enter_update_time_and_count(self, total_food_count: int) -> None:
         """
         enter the date/time the scraper is starting in the database
         """
         db_session = self.Session()
         try:
-            db_session.add(Update(date=datetime.utcnow()))
+            db_session.add(Update(date=datetime.utcnow(), count=total_food_count))
             db_session.commit()
         except Exception as e:
             db_session.rollback()
             self.logger.error("Error entering update time: {}".format(e))
         finally:
             db_session.close()
+
+    def _get_total_food_count(self, url) -> int:
+        """
+        enter the total food count on chewy.com when the scraper is starting into the database
+        """
+        r = self._make_request(url)
+        soup = BeautifulSoup(r.content, "html.parser")
+        results = soup.find("p", "results-count").string
+        results = re.sub('\s+', ' ', results).split()
+        return int(results[4])
 
     def _pages_of_results(self, url: str) -> int:
         """
@@ -408,3 +427,19 @@ class Scraper:
         page_size = int(results[2])
         total_results = int(results[4])
         return ceil(total_results / page_size)
+
+    def _new_total_count_greaterthan_last(self, new_total: int) -> bool:
+        """
+        compare the new total food count to the total food count on the last update
+        """
+        db_session = self.Session()
+        last_total = float('inf')
+        try:
+            last_total = int(db_session.query(sa.func.max(Update.count)).first()[0])
+        except Exception as e:
+            db_session.rollback()
+            self.logger.error("Error entering update time: {}".format(e))
+        finally:
+            db_session.close()
+
+        return new_total > last_total

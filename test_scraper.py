@@ -12,7 +12,8 @@ class TestScraper(TestCase):
 
     def setUp(self) -> None:
         self.s = Scraper(database="testscraperdb.cnf", logger=self.logger)
-        self.s._enter_update_time()
+        url = 'https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&page=1'
+        self.s._enter_update_time_and_count(self.s._get_total_food_count(url))
 
     def tearDown(self) -> None:
         self.s.engine.dispose()
@@ -171,6 +172,14 @@ class TestScraper(TestCase):
 
     def test__pages_of_results(self):
         results = self.s._pages_of_results('https://www.chewy.com/s?rh=c%3A288%2Cc%3A332&page=1')
-        self.assertEqual(100, results)
+        self.assertEqual(101, results)
         results = self.s._pages_of_results('https://www.chewy.com/s?rh=c%3A288%2Cc%3A332%2Cc%3A294')
         self.assertEqual(43, results)
+
+    def test__new_total_count_greaterthan_last(self):
+        new_total = 3600
+        self.assertFalse(self.s._new_total_count_greaterthan_last(new_total))
+        new_total = 3603
+        self.assertFalse(self.s._new_total_count_greaterthan_last(new_total))
+        new_total = 3604
+        self.assertTrue(self.s._new_total_count_greaterthan_last(new_total))
