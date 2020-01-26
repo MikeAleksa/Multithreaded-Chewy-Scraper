@@ -64,9 +64,13 @@ class Scraper:
     A multithreaded scraper for Chewy.com - pages to scrape are enqueued to be serviced by a pool of worker threads
     """
 
-    def __init__(self, database: str, num_threads: int = 5, logger: ScraperLogger = SilentScraperLogger()):
+    def __init__(self, database: str, num_threads: int = 5, logger: ScraperLogger = SilentScraperLogger(),
+                 force: bool = False):
         # logger
         self.logger = logger
+
+        # force run
+        self.force: bool = force
 
         # queue of scraping jobs
         self.scrape_queue = queue.Queue()
@@ -126,13 +130,14 @@ class Scraper:
         """
         # enter time of scrape in database
         total_food_count = self._get_total_food_count(url + '1')
+        self._enter_update_time_and_count(self._get_total_food_count(url + '1'))
 
         # quit scraper if no new foods on Chewy.com, otherwise continue
         if self._new_total_count_greaterthan_last(total_food_count):
-            self._enter_update_time_and_count(self._get_total_food_count(url + '1'))
             self.logger.message('New Foods Found... Beginning Scraping...')
+        elif self.force is True:
+            self.logger.message('Forcing Scrape... Beginning Scraping...')
         else:
-            self._enter_update_time_and_count(self._get_total_food_count(url + '1'))
             self.logger.message('No New Foods To Scrape... Exiting...')
             return
 
